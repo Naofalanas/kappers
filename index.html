@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kapper's - Premium Barbershop</title>
+
+    <!-- Google Fonts: Plus Jakarta Sans for Modern/Clean Look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Phosphor Icons for Clean Minimalist Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- Project Styles -->
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+
+<body>
+    <!-- Navbar Component -->
+    <nav class="navbar glass">
+        <div class="container nav-container">
+            <a href="#" class="logo">Kapper's.</a>
+            <div class="nav-links" id="nav-links">
+                <a href="#services">Layanan</a>
+                <a href="#barbers">Capster</a>
+                <a href="#booking-section">Reservasi</a>
+            </div>
+            <div class="nav-actions">
+                <a href="#booking-section" class="btn btn-primary hide-mobile">Book Now</a>
+                <button class="mobile-toggle" id="mobile-toggle"><i class="ph ph-list"></i></button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Hero Section -->
+        <section class="hero" id="home">
+            <div class="container hero-container">
+                <div class="hero-content">
+                    <span class="badge">Premium Grooming Experience</span>
+                    <h1>Tampil <span class="text-accent">Maksimal.</span><br>Setiap Hari.</h1>
+                    <p>Rasakan pengalaman pangkas rambut dengan pelayanan premium, lingkungan yang bersih, dan *barb*er
+                        profesional yang mengerti gaya rambut modern.</p>
+                    <div class="hero-buttons">
+                        <button class="btn btn-primary"
+                            onclick="document.getElementById('booking-section').scrollIntoView({behavior: 'smooth'})">Book
+                            Appointment</button>
+                        <a href="#services" class="btn btn-outline">Lihat Layanan &rarr;</a>
+                    </div>
+
+                    <!-- Live Queue Indicator -->
+                    <div id="live-queue-indicator" style="margin-bottom: 2rem; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 999px; font-weight: 600; font-size: 0.875rem; background: rgba(241, 245, 249, 0.8); backdrop-filter: blur(5px); border: 1px solid var(--border-light); color: var(--text-secondary);">
+                        <i class="ph ph-spinner ph-spin"></i> Mengecek antrian toko saat ini...
+                    </div>
+
+                    <div class="hero-stats">
+                        <div class="stat-item">
+                            <h3>4.9/5</h3>
+                            <p>Review Puas</p>
+                        </div>
+                        <div class="stat-item">
+                            <h3>500+</h3>
+                            <p>Customer Rutin</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hero-image-wrapper">
+                    <img src="./assets/img/hero.png" alt="Interior Barbershop Modern" class="hero-image">
+
+                    <!-- Decorative Floating Element -->
+                    <div class="floating-card glass">
+                        <div class="fc-icon"><i class="ph ph-scissors"></i></div>
+                        <div class="fc-text">
+                            <strong>Top Barbers</strong>
+                            <span>Expertise in fade & classic cuts</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Services Section -->
+        <section class="services" id="services">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Layanan Signature Kami</h2>
+                    <p>Pilih layanan yang sesuai dengan kebutuhan Anda. Harga transparan tanpa biaya tersembunyi.</p>
+                </div>
+
+                <div class="services-grid" id="public-services-grid">
+                    <div style="text-align:center; grid-column: 1/-1; padding: 3rem;">
+                        <i class="ph ph-spinner ph-spin" style="font-size:2rem; color:var(--accent-color)"></i>
+                        <p style="margin-top:1rem">Memuat data layanan resmi Kapper's...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Barbers Showcase Section -->
+        <section class="barbers" id="barbers" style="background-color: var(--bg-tertiary); padding: 6rem 0;">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Capster Profesional Kami</h2>
+                    <p>Ditangani langsung oleh ahlinya. Pilih capster favorit Anda untuk hasil yang lebih personal dan maksimal.</p>
+                </div>
+
+                <div class="barbers-grid" id="public-barbers-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem;">
+                    <div style="text-align:center; grid-column: 1/-1; padding: 3rem;">
+                        <i class="ph ph-spinner ph-spin" style="font-size:2rem; color:var(--accent-color)"></i>
+                        <p style="margin-top:1rem">Memuat daftar Capster...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Portfolio / Gallery Section -->
+        <section class="portfolio" id="portfolio" style="padding: 6rem 0;">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Karya Terbaik Kapper's</h2>
+                    <p>Inspirasi potongan gaya rambut klasik, modern, hingga tren terkini dari kursi eksekutif kami.</p>
+                </div>
+                <div id="public-gallery-grid" class="gallery-grid">
+                    <div style="grid-column: 1/-1; text-align: center; color: var(--text-secondary); padding: 2rem;">Memuat Portofolio...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Booking Section -->
+        <section class="booking-section pt-0" id="booking-section">
+            <div class="container">
+                <div class="booking-card">
+                    <div class="booking-header">
+                        <h2>Reservasi Sekarang</h2>
+                        <p>Hanya butuh 2 menit untuk menjadwalkan penampilan terbaikmu hari ini.</p>
+
+                        <!-- Step Progress -->
+                        <div class="progress-wrapper">
+                            <div class="progress-line">
+                                <div class="progress-line-fill" id="progress-fill"></div>
+                            </div>
+                            <div class="step-dots">
+                                <div class="step-dot active" data-step="1">1</div>
+                                <div class="step-dot" data-step="2">2</div>
+                                <div class="step-dot" data-step="3">3</div>
+                                <div class="step-dot" data-step="4">4</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="booking-body">
+                        <!-- Step 1: Select Service -->
+                        <div class="booking-step active" id="step-1">
+                            <h3>1. Pilih Layanan</h3>
+                            <div class="options-grid" id="booking-services-grid">
+                                <label class="selectable-card">
+                                    <div class="sc-content">
+                                        <i class="ph ph-spinner ph-spin" style="font-size:2rem"></i>
+                                        <strong>Memuat Data...</strong>
+                                        <span>Sinkronisasi Master Service</span>
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="step-footer">
+                                <div></div>
+                                <button class="btn btn-primary next-btn">Selanjutnya &rarr;</button>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Select Barber -->
+                        <div class="booking-step" id="step-2">
+                            <h3>2. Pilih Capster (Barber)</h3>
+                            <div class="options-grid" id="barber-options-container">
+                                <label class="selectable-card">
+                                    <div class="sc-content barber-profile">
+                                        <div class="avatar" style="background:#64748B;"><i class="ph ph-spinner ph-spin"></i></div>
+                                        <strong>Memuat Data...</strong>
+                                        <span>Sinkronisasi Server</span>
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="step-footer">
+                                <button class="btn btn-outline prev-btn">&larr; Kembali</button>
+                                <button class="btn btn-primary next-btn">Selanjutnya &rarr;</button>
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Pick Date & Time -->
+                        <div class="booking-step" id="step-3">
+                            <h3>3. Pilih Jadwal</h3>
+                            <div class="schedule-container">
+                                <div class="form-group">
+                                    <label>Tanggal</label>
+                                    <input type="date" id="booking-date" class="form-control" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Jam Tersedia</label>
+                                    <div class="time-slots">
+                                        <label class="time-slot"><input type="radio" name="time"
+                                                value="10:00"><span>10:00</span></label>
+                                        <label class="time-slot"><input type="radio" name="time"
+                                                value="11:00"><span>11:00</span></label>
+                                        <label class="time-slot"><input type="radio" name="time"
+                                                value="13:00"><span>13:00</span></label>
+                                        <label class="time-slot"><input type="radio" name="time"
+                                                value="14:00"><span>14:00</span></label>
+                                        <label class="time-slot disabled"><input type="radio" name="time" value="15:00"
+                                                disabled><span>15:00 (Penuh)</span></label>
+                                        <label class="time-slot"><input type="radio" name="time"
+                                                value="16:00"><span>16:00</span></label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="step-footer">
+                                <button class="btn btn-outline prev-btn">&larr; Kembali</button>
+                                <button class="btn btn-primary next-btn">Selanjutnya &rarr;</button>
+                            </div>
+                        </div>
+
+                        <!-- Step 4: User Details & Confirm -->
+                        <div class="booking-step" id="step-4">
+                            <h3>4. Detail Kontak & Konfirmasi</h3>
+                            <div class="summary-box">
+                                <p><strong>Layanan:</strong> <span id="sum-service">-</span></p>
+                                <p><strong>Capster:</strong> <span id="sum-barber">-</span></p>
+                                <p><strong>Jadwal:</strong> <span id="sum-datetime">-</span></p>
+                            </div>
+                            <div class="user-details-form">
+                                <div class="form-group">
+                                    <label>Nama Lengkap</label>
+                                    <input type="text" id="user-name" class="form-control"
+                                        placeholder="Cth: Naofal Anas" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Nomor WhatsApp</label>
+                                    <input type="tel" id="user-phone" class="form-control"
+                                        placeholder="Cth: 08123456789" required>
+                                </div>
+                            </div>
+                            <div class="step-footer">
+                                <button class="btn btn-outline prev-btn">&larr; Kembali</button>
+                                <button class="btn btn-primary confirm-btn">Konfirmasi & Pesan</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer Area -->
+    <footer class="footer">
+        <div class="container footer-grid">
+            <div class="footer-brand">
+                <h3>Kapper's</h3>
+                <p>Premium Barbershop Executive di kota Anda. Kami memberikan layanan pangkas rambut terbaik dengan standar profesional.</p>
+            </div>
+            <div class="footer-hours">
+                <h4>Jam Operasional</h4>
+                <ul>
+                    <li><span class="day">Senin - Jumat</span> <span class="time">10:00 - 21:00</span></li>
+                    <li><span class="day">Sabtu - Minggu</span> <span class="time">09:00 - 22:00</span></li>
+                </ul>
+            </div>
+            <div class="footer-contact">
+                <h4>Hubungi Kami</h4>
+                <p><i class="ph ph-map-pin"></i> Jl. Sultan Iskandar Muda No. 12, Jakarta</p>
+                <p><i class="ph ph-whatsapp"></i> +62 812-3456-7890</p>
+                <div class="barber-socials" style="justify-content: flex-start; margin-top: 1rem;">
+                    <a href="#" aria-label="Instagram"><i class="ph ph-instagram-logo"></i></a>
+                    <a href="#" aria-label="Tiktok"><i class="ph ph-tiktok-logo"></i></a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Kapper's Barbershop. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Project Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Supabase CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./js/supabase.js"></script>
+    <script src="./js/app.js"></script>
+</body>
+
+</html>

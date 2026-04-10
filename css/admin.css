@@ -1,0 +1,275 @@
+/* 
+  Admin Dashboard Custom Styles
+*/
+
+.admin-body {
+    display: flex;
+    background-color: var(--bg-tertiary);
+}
+
+/* Sidebar */
+.sidebar {
+    width: 260px;
+    background-color: var(--bg-primary);
+    border-right: 1px solid var(--border-light);
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    padding: 2rem 0;
+}
+
+.sidebar-header {
+    padding: 0 2rem 2rem 2rem;
+    border-bottom: 1px solid var(--border-light);
+    margin-bottom: 1rem;
+}
+
+.sidebar-menu {
+    list-style: none;
+}
+
+.sidebar-menu li a {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 2rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    transition: all var(--transition-fast);
+}
+
+.sidebar-menu li a i {
+    font-size: 1.25rem;
+}
+
+.sidebar-menu li a:hover, .sidebar-menu li.active a {
+    color: var(--accent-color);
+    background-color: var(--bg-secondary);
+    border-right: 3px solid var(--accent-color);
+}
+
+/* Main Content */
+.admin-content {
+    margin-left: 260px;
+    width: calc(100% - 260px);
+    padding: 2rem 3rem;
+}
+
+.admin-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    margin-bottom: 0.25rem;
+}
+
+/* Dashboard Stats */
+.dashboard-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background-color: var(--bg-primary);
+    padding: 1.5rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.stat-card i {
+    font-size: 2.5rem;
+    color: var(--accent-color);
+    background-color: var(--bg-secondary);
+    padding: 1rem;
+    border-radius: var(--radius-sm);
+}
+
+.sc-info h3 {
+    font-size: 1.75rem;
+}
+
+/* Data Table */
+.table-container {
+    background: var(--bg-primary);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-light);
+    overflow: hidden;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th, .data-table td {
+    padding: 1.25rem 1.5rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.data-table th {
+    background-color: var(--bg-secondary);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    letter-spacing: 0.05em;
+}
+
+.data-table tr:last-child td {
+    border-bottom: none;
+}
+
+.data-table tr:hover {
+    background-color: var(--bg-secondary);
+}
+
+/* Status Badges */
+.status {
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.status.pending { background-color: #FEF08A; color: #854D0E; }
+.status.completed { background-color: #BBF7D0; color: #166534; }
+.status.cancelled { background-color: #FECDD3; color: #9F1239; }
+
+/* Control Buttons */
+.btn-sm {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    border-radius: var(--radius-sm);
+}
+
+/* Tab Navigation System (SPA) */
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+}
+
+/* Custom Modal CSS */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(5px);
+    display: none; align-items: center; justify-content: center;
+    z-index: 1000;
+}
+.modal-overlay.active { display: flex; animation: fadeIn 0.3s; }
+.modal-card {
+    background: var(--bg-primary); padding: 2rem;
+    border-radius: var(--radius-lg); width: 100%; max-width: 500px;
+    border: 1px solid var(--border-light);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+}
+#pos-product-list li {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.5rem 0; border-bottom: 1px dashed var(--border-light);
+}
+
+/* =========================================
+   Responsive Design for Admin Dashboard
+========================================= */
+.admin-mobile-header {
+    display: none;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-primary);
+    padding: 1rem 2rem;
+    border-bottom: 1px solid var(--border-light);
+    margin: -2rem -3rem 2rem -3rem; /* Compensate for admin-content padding */
+}
+
+@media (max-width: 992px) {
+    .sidebar {
+        transform: translateX(-100%);
+        z-index: 2000;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 4px 0 20px rgba(0,0,0,0.1);
+    }
+    .sidebar.active {
+        transform: translateX(0);
+    }
+    .admin-content {
+        margin-left: 0;
+        width: 100%;
+        padding: 2rem 1.5rem;
+    }
+    .admin-mobile-header {
+        display: flex;
+        margin: -2rem -1.5rem 2rem -1.5rem;
+    }
+    .admin-topbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    .admin-topbar div {
+        width: 100%;
+    }
+    .admin-topbar button {
+        flex: 1;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-stats {
+        grid-template-columns: 1fr;
+    }
+    .table-container {
+        overflow-x: auto;
+    }
+    .admin-topbar div {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .dashboard-stats .stat-card {
+        padding: 1rem;
+    }
+}
+
+/* =========================================
+   Print Styles (Thermal Printer 58mm/80mm)
+========================================= */
+#print-area { display: none; }
+
+@media print {
+    body * { display: none !important; }
+    #print-area, #print-area * { display: block !important; }
+    #print-area {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; max-width: 80mm;
+        margin: 0; padding: 0;
+        font-family: monospace;
+        font-size: 12px;
+        color: black;
+    }
+    .print-center { text-align: center !important; }
+    .print-right { text-align: right !important; }
+    .print-flex { display: flex !important; justify-content: space-between !important; }
+    .print-flex span { display: inline-block !important; }
+    .print-line { border-bottom: 1px dashed black !important; margin: 5px 0 !important; }
+}

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - Kapper's</title>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="./css/style.css">
+
+    <style>
+        body {
+            background-color: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        .login-card {
+            background-color: var(--bg-primary);
+            padding: 3rem;
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border-light);
+            text-align: center;
+        }
+
+        .login-card h2 {
+            margin-bottom: 2rem;
+            font-size: 1.75rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-card">
+        <h2>🔒 Kapper's Admin</h2>
+
+        <form id="login-form">
+            <div class="form-group" style="text-align: left;">
+                <label>Email Address</label>
+                <input type="email" id="email" class="form-control" required placeholder="Email Anda">
+            </div>
+
+            <div class="form-group" style="text-align: left;">
+                <label>Password</label>
+                <input type="password" id="password" class="form-control" required placeholder="Password Anda">
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;" id="btn-login">Login
+                Akses</button>
+        </form>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./js/supabase.js"></script>
+    <script src="./js/login.js"></script>
+</body>
+
+</html>

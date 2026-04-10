@@ -1,0 +1,1018 @@
+document.addEventListener("DOMContentLoaded", () => {
+    // Wait for Supabase to instantiate
+    setTimeout(() => {
+        adminLogic.init();
+    }, 500);
+});
+
+const adminLogic = {
+    bookingsCache: [],
+    masterCache: {
+        employees: [],
+        services: [],
+        products: []
+    },
+    posState: {
+        bookingId: null,
+        capster: null,
+        servicePrice: 50000,
+        selectedProducts: [],
+        allProducts: [],
+        employees: []
+    },
+
+    async init() {
+        console.log("Admin Dashboard Initialized");
+
+        let isAdmin = false;
+
+        // === Check Auth Session Middlewware ===
+        if (window.supabaseClient) {
+            const { data: { session } } = await window.supabaseClient.auth.getSession();
+            if (!session) {
+                // Kick out if not logged in
+                window.location.replace("login.html");
+                return;
+            }
+            
+            // Check Admin Role
+            const ADMIN_EMAILS = ['owner@barber.com'];
+            if (session.user && ADMIN_EMAILS.includes(session.user.email)) {
+                isAdmin = true;
+            }
+        }
+
+        // Apply Kasir Role Restrictions
+        if (!isAdmin) {
+            // Hide Sidebar Menus
+            const mMaster = document.querySelector('[data-target="tab-master"]');
+            const mLaporan = document.querySelector('[data-target="tab-laporan"]');
+            const mGaleri = document.querySelector('[data-target="tab-galeri"]');
+            if(mMaster) mMaster.parentElement.style.display = 'none';
+            if(mLaporan) mLaporan.parentElement.style.display = 'none';
+            if(mGaleri) mGaleri.parentElement.style.display = 'none';
+            
+            // Remove the tabs entirely from DOM
+            const tabMaster = document.getElementById('tab-master');
+            const tabLaporan = document.getElementById('tab-laporan');
+            const tabGaleri = document.getElementById('tab-galeri');
+            if(tabMaster) tabMaster.remove();
+            if(tabLaporan) tabLaporan.remove();
+            if(tabGaleri) tabGaleri.remove();
+        }
+
+        // Setup Tab Navigation Logic
+        this.setupTabNavigation();
+
+        // Setup Forms (Admin Only)
+        if (isAdmin) {
+            this.setupMasterForms();
+        }
+
+        // Fetch Data for both roles
+        await this.fetchData();
+        
+        // Fetch Admin-only Data
+        if (isAdmin) {
+            await this.fetchMasterData();
+            await this.fetchLaporan();
+            await this.fetchGalleryData();
+        }
+
+        // Setup Mobile Sidebar Toggle
+        const btnSidebar = document.getElementById('btn-mobile-sidebar');
+        const sidebar = document.querySelector('.sidebar');
+        if (btnSidebar && sidebar) {
+            btnSidebar.addEventListener('click', () => {
+                sidebar.classList.toggle('active');
+            });
+            // Close sidebar when clicking outside (in mobile view)
+            document.addEventListener('click', (e) => {
+                if(window.innerWidth <= 992 && !sidebar.contains(e.target) && !btnSidebar.contains(e.target)) {
+                    sidebar.classList.remove('active');
+                }
+            });
+        }
+
+        // Setup Logout Listener
+        const btnLogout = document.getElementById('btn-logout');
+        if (btnLogout) {
+            btnLogout.addEventListener('click', async (e) => {
+                e.preventDefault();
+
+                // Show loading state
+                Swal.fire({
+                    title: 'Memproses...',
+                    text: 'Sedang keluar dari akun...',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                try {
+                    await window.supabaseClient.auth.signOut();
+                    window.location.replace('login.html');
+                } catch (error) {
+                    Swal.fire('Error', 'Gagal logout: ' + error.message, 'error');
+                }
+            });
+        }
+    },
+
+    setupTabNavigation() {
+        const sidebarLinks = document.querySelectorAll('#admin-sidebar a[data-target]');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        sidebarLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+
+                // Remove active class from all links and tabs
+                sidebarLinks.forEach(l => l.parentElement.classList.remove('active'));
+                tabContents.forEach(tab => tab.classList.remove('active'));
+
+                // Add active class to clicked link
+                link.parentElement.classList.add('active');
+
+                // Show target tab
+                const targetId = link.getAttribute('data-target');
+                const targetTab = document.getElementById(targetId);
+                if (targetTab) {
+                    targetTab.classList.add('active');
+                }
+                // Hide source sidebar on mobile
+                if(window.innerWidth <= 992) {
+                    document.querySelector('.sidebar').classList.remove('active');
+                }
+            });
+        });
+    },
+
+    async fetchData() {
+        if (!window.db || !window.db.getAllBookings) {
+            console.error("Database functions not ready or API Key missing.");
+            document.getElementById('bookings-table-body').innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem;">Error: Sistem Database (Supabase) belum terkonfigurasi di js/supabase.js</td></tr>`;
+            return;
+        }
+
+        const tbody = document.getElementById('bookings-table-body');
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem;"><i class="ph ph-spinner ph-spin"></i> Mengambil data...</td></tr>`;
+
+        const res = await window.db.getAllBookings();
+
+        if (res.success) {
+            this.bookingsCache = res.data;
+            this.renderTable(res.data);
+            this.updateStats(res.data);
+        } else {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: red;">Error: ${res.error}</td></tr>`;
+        }
+    },
+
+    updateStats(data) {
+        document.getElementById('stat-total').innerText = data.length;
+        const pending = data.filter(d => d.status === 'pending').length;
+        const completed = data.filter(d => d.status === 'completed').length;
+        document.getElementById('stat-pending').innerText = pending;
+        document.getElementById('stat-completed').innerText = completed;
+    },
+
+    renderTable(data) {
+        const tbody = document.getElementById('bookings-table-body');
+        tbody.innerHTML = "";
+
+        if (data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 3rem;">Belum ada pesanan masuk.</td></tr>`;
+            return;
+        }
+
+        data.forEach(booking => {
+            const tr = document.createElement('tr');
+
+            // Format Layanan dan Capster untuk tampilan bersih
+            const serviceDisplay = booking.service_id.toUpperCase();
+            const capsterDisplay = booking.barber_id === 'any' ? 'Bebas' : booking.barber_id.toUpperCase();
+
+            tr.innerHTML = `
+                <td>
+                    <strong>${booking.booking_date}</strong><br>
+                    <span style="color:var(--text-secondary); font-size:0.875rem;">Pukul ${booking.time_slot}</span>
+                </td>
+                <td>
+                    <strong>${booking.customer_name}</strong><br>
+                    <span style="color:var(--text-secondary); font-size:0.875rem;">${booking.customer_phone}</span>
+                </td>
+                <td>${serviceDisplay}</td>
+                <td>${capsterDisplay}</td>
+                <td><span class="status ${booking.status}">${booking.status}</span></td>
+                <td>
+                    ${booking.status === 'pending' ? `
+                        <button class="btn btn-outline btn-sm action-btn" onclick="adminLogic.openPos('${booking.id}')" style="border-color:#22c55e; color:#22c55e;" title="Selesaikan & Buka Kasir"><i class="ph ph-check"></i></button>
+                        <button class="btn btn-outline btn-sm action-btn" onclick="adminLogic.updateStatus('${booking.id}', 'cancelled')" style="border-color:#ef4444; color:#ef4444;" title="Batalkan Pesanan"><i class="ph ph-x"></i></button>
+                    ` : `<span style="font-size:0.8rem; color:var(--text-secondary);">No Action</span>`}
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    },
+
+    async updateStatus(id, newStatus) {
+        Swal.fire({
+            title: 'Konfirmasi',
+            text: `Ubah status pesanan menjadi ${newStatus.toUpperCase()}?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Ya, Ubah',
+            cancelButtonText: 'Batal'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                const res = await window.db.updateBookingStatus(id, newStatus);
+                if (res.success) {
+                    Swal.fire('Berhasil!', 'Status telah diupdate.', 'success');
+                    this.fetchData(); // reload table
+                } else {
+                    Swal.fire('Gagal!', res.error, 'error');
+                }
+            }
+        });
+    },
+
+    // ===================================
+    // MASTER DATA (PHASE 6)
+    // ===================================
+
+    setupMasterForms() {
+        const fEmp = document.getElementById('form-employee');
+        const fProd = document.getElementById('form-product');
+        const fSrv = document.getElementById('form-service');
+
+        if (fEmp) {
+            fEmp.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const payload = {
+                    name: document.getElementById('emp-name').value,
+                    salary_type: document.getElementById('emp-type').value,
+                    salary_value: document.getElementById('emp-value').value,
+                    role_title: document.getElementById('emp-role') ? (document.getElementById('emp-role').value || 'Senior Barber') : 'Senior Barber',
+                    ig_username: document.getElementById('emp-ig') ? document.getElementById('emp-ig').value : null,
+                    tiktok_username: document.getElementById('emp-tiktok') ? document.getElementById('emp-tiktok').value : null
+                };
+                Swal.showLoading();
+                const res = await window.db.addEmployee(payload);
+                if (res.success) {
+                    fEmp.reset();
+                    Swal.fire('Tersimpan', 'Pegawai berhasil ditambahkan', 'success');
+                    this.fetchMasterData();
+                } else Swal.fire('Error', res.error, 'error');
+            });
+        }
+
+        if (fSrv) {
+            fSrv.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const payload = {
+                    name: document.getElementById('srv-name').value,
+                    description: document.getElementById('srv-desc').value,
+                    price: document.getElementById('srv-price').value
+                };
+                Swal.showLoading();
+                const res = await window.db.addService(payload);
+                if (res.success) {
+                    fSrv.reset();
+                    Swal.fire('Tersimpan', 'Layanan berhasil ditambahkan', 'success');
+                    this.fetchMasterData();
+                } else Swal.fire('Error', res.error, 'error');
+            });
+        }
+
+        if (fProd) {
+            fProd.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const payload = {
+                    name: document.getElementById('prod-name').value,
+                    price: document.getElementById('prod-price').value,
+                    stock: document.getElementById('prod-stock').value
+                };
+                Swal.showLoading();
+                const res = await window.db.addProduct(payload);
+                if (res.success) {
+                    fProd.reset();
+                    Swal.fire('Tersimpan', 'Produk berhasil ditambahkan', 'success');
+                    this.fetchMasterData();
+                } else Swal.fire('Error', res.error, 'error');
+            });
+        }
+
+        const fExp = document.getElementById('form-expense');
+        if (fExp) {
+            // Set default date to today
+            document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
+            fExp.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const payload = {
+                    description: document.getElementById('exp-desc').value,
+                    amount: document.getElementById('exp-amount').value,
+                    expense_date: document.getElementById('exp-date').value
+                };
+                Swal.showLoading();
+                const res = await window.db.addExpense(payload);
+                if (res.success) {
+                    fExp.reset();
+                    document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
+                    Swal.fire('Tersimpan', 'Pengeluaran berhasil dicatat', 'success');
+                    this.fetchLaporan();
+                } else Swal.fire('Error', res.error, 'error');
+            });
+        }
+    },
+
+    async fetchMasterData() {
+        if (!window.db) return;
+
+        // Fetch Employees
+        const elRes = await window.db.getEmployees();
+        const tbodyEmp = document.getElementById('table-employees');
+        if (elRes.success) {
+            this.masterCache.employees = elRes.data;
+            tbodyEmp.innerHTML = '';
+            if (elRes.data.length === 0) tbodyEmp.innerHTML = `<tr><td colspan="3" style="text-align:center">Belum ada pegawai.</td></tr>`;
+            elRes.data.forEach(e => {
+                const tr = document.createElement('tr');
+                const tag = e.salary_type === 'percentage' ? `${e.salary_value}%` : `Rp ${e.salary_value.toLocaleString()}`;
+                const isActive = e.is_active !== false;
+                const statusBadge = isActive ? `<span class="status completed" style="background:rgba(34,197,94,0.1); color:#22c55e;">AKTIF</span>` : `<span class="status pending" style="background:rgba(100,116,139,0.1); color:#64748B;">LIBUR</span>`;
+                tr.innerHTML = `
+                    <td><strong>${e.name}</strong><br><div style="margin-top:0.3rem">${statusBadge} <span style="font-size:0.75rem; color:var(--text-secondary)">${tag}</span></div></td>
+                    <td>
+                        <button class="btn btn-outline btn-sm action-btn" onclick="adminLogic.toggleMaster('${e.id}', ${isActive})" style="color:${isActive ? '#f97316' : '#22c55e'}; border-color:${isActive ? '#f97316' : '#22c55e'}; margin-right:0.25rem;" title="${isActive ? 'Set Libur' : 'Set Aktif'}"><i class="ph ph-power"></i></button>
+                        <button class="btn btn-outline btn-sm action-btn" onclick="adminLogic.editMaster('employee', '${e.id}')" style="color:var(--accent-color); border-color:var(--accent-color); margin-right:0.25rem;" title="Edit Data"><i class="ph ph-pencil-simple"></i></button>
+                        <button class="btn btn-outline btn-sm action-btn" onclick="adminLogic.deleteMaster('employee', '${e.id}')" style="color:red; border-color:red" title="Hapus Data"><i class="ph ph-trash"></i></button>
+                    </td>
+                `;
+                tbodyEmp.appendChild(tr);
+            });
+        }
+
+        // Fetch Services
+        const srvRes = await window.db.getServices();
+        const tbodySrv = document.getElementById('table-services');
+        if (srvRes.success) {
+            this.masterCache.services = srvRes.data;
+            tbodySrv.innerHTML = '';
+            if (srvRes.data.length === 0) tbodySrv.innerHTML = `<tr><td colspan="3" style="text-align:center">Belum ada layanan reguler terdaftar.</td></tr>`;
+            srvRes.data.forEach(s => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${s.name}</strong></td>
+                    <td style="color:var(--accent-color); font-weight:600">Rp ${parseFloat(s.price).toLocaleString()}</td>
+                    <td>
+                        <button class="btn btn-outline btn-sm action-btn" onclick="adminLogic.editMaster('service', '${s.id}')" style="color:var(--accent-color); border-color:var(--accent-color); margin-right:0.25rem;" title="Edit Data"><i class="ph ph-pencil-simple"></i></button>
+                        <button class="btn btn-outline btn-sm action-btn" onclick="adminLogic.deleteMaster('service', '${s.id}')" style="color:red; border-color:red" title="Hapus Data"><i class="ph ph-trash"></i></button>
+                    </td>
+                `;
+                tbodySrv.appendChild(tr);
+            });
+        }
+
+        // Fetch Products
+        const prodRes = await window.db.getProducts();
+        const tbodyProd = document.getElementById('table-products');
+        if (prodRes.success) {
+            this.masterCache.products = prodRes.data;
+            tbodyProd.innerHTML = '';
+            if (prodRes.data.length === 0) tbodyProd.innerHTML = `<tr><td colspan="4" style="text-align:center">Belum ada produk.</td></tr>`;
+            prodRes.data.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${p.name}</strong></td>
+                    <td>Rp ${p.price.toLocaleString()}</td>
+                    <td>${p.stock}</td>
+                    <td>
+                        <button class="btn btn-outline btn-sm action-btn" onclick="adminLogic.editMaster('product', '${p.id}')" style="color:var(--accent-color); border-color:var(--accent-color); margin-right:0.25rem;" title="Edit Data"><i class="ph ph-pencil-simple"></i></button>
+                        <button class="btn btn-outline btn-sm action-btn" onclick="adminLogic.deleteMaster('product', '${p.id}')" style="color:red; border-color:red" title="Hapus Data"><i class="ph ph-trash"></i></button>
+                    </td>
+                `;
+                tbodyProd.appendChild(tr);
+            });
+        }
+    },
+
+    async editMaster(type, id) {
+        let item, formHtml, preConfirm;
+        if (type === 'employee') {
+            item = this.masterCache.employees.find(e => e.id === id);
+            formHtml = `
+                <input id="edit-emp-name" class="swal2-input" value="${item.name}" placeholder="Nama Kapster" style="width:80%">
+                <input id="edit-emp-role" class="swal2-input" value="${item.role_title || ''}" placeholder="Jabatan Opsional (Default: Senior Barber)" style="width:80%">
+                <input id="edit-emp-ig" class="swal2-input" value="${item.ig_username || ''}" placeholder="Username IG (Opsional)" style="width:80%">
+                <input id="edit-emp-tiktok" class="swal2-input" value="${item.tiktok_username || ''}" placeholder="Username TikTok (Opsional)" style="width:80%">
+                <select id="edit-emp-type" class="swal2-select" style="width:80%">
+                    <option value="percentage" ${item.salary_type==='percentage'?'selected':''}>Sistem Bagi Hasil (%)</option>
+                    <option value="fixed" ${item.salary_type==='fixed'?'selected':''}>Gaji Pokok (Rp)</option>
+                </select>
+                <input id="edit-emp-value" type="number" class="swal2-input" value="${item.salary_value}" placeholder="Nominal" style="width:80%">
+            `;
+            preConfirm = () => ({
+                name: document.getElementById('edit-emp-name').value,
+                salary_type: document.getElementById('edit-emp-type').value,
+                salary_value: document.getElementById('edit-emp-value').value,
+                role_title: document.getElementById('edit-emp-role').value || 'Senior Barber',
+                ig_username: document.getElementById('edit-emp-ig').value || null,
+                tiktok_username: document.getElementById('edit-emp-tiktok').value || null
+            });
+        } else if (type === 'service') {
+            item = this.masterCache.services.find(s => s.id === id);
+            formHtml = `
+                <input id="edit-srv-name" class="swal2-input" value="${item.name}" placeholder="Nama Layanan" style="width:80%">
+                <input id="edit-srv-desc" class="swal2-input" value="${item.description || ''}" placeholder="Deskripsi" style="width:80%">
+                <input id="edit-srv-price" type="number" class="swal2-input" value="${item.price}" placeholder="Harga" style="width:80%">
+            `;
+            preConfirm = () => ({
+                name: document.getElementById('edit-srv-name').value,
+                description: document.getElementById('edit-srv-desc').value,
+                price: document.getElementById('edit-srv-price').value
+            });
+        } else if (type === 'product') {
+            item = this.masterCache.products.find(p => p.id === id);
+            formHtml = `
+                <input id="edit-prod-name" class="swal2-input" value="${item.name}" placeholder="Nama Produk" style="width:80%">
+                <input id="edit-prod-price" type="number" class="swal2-input" value="${item.price}" placeholder="Harga (Rp)" style="width:80%">
+                <input id="edit-prod-stock" type="number" class="swal2-input" value="${item.stock}" placeholder="Stok Produk" style="width:80%">
+            `;
+            preConfirm = () => ({
+                name: document.getElementById('edit-prod-name').value,
+                price: document.getElementById('edit-prod-price').value,
+                stock: document.getElementById('edit-prod-stock').value
+            });
+        }
+
+        Swal.fire({
+            title: `Edit Data`,
+            html: formHtml,
+            showCancelButton: true,
+            confirmButtonText: 'Simpan',
+            cancelButtonText: 'Batal',
+            preConfirm: preConfirm
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                Swal.showLoading();
+                let res;
+                if (type === 'employee') res = await window.db.updateEmployee(id, result.value);
+                if (type === 'service') res = await window.db.updateService(id, result.value);
+                if (type === 'product') res = await window.db.updateProduct(id, result.value);
+
+                if (res.success) {
+                    Swal.fire('Tersimpan', 'Data berhasil diupdate', 'success');
+                    this.fetchMasterData();
+                } else {
+                    Swal.fire('Error', res.error, 'error');
+                }
+            }
+        });
+    },
+
+    async toggleMaster(id, currentStatus) {
+        const newStatus = !currentStatus;
+        const confirmText = newStatus ? 'Aktifkan Kapster ini?' : 'Set Kapster ini menjadi Libur / Off?';
+        
+        Swal.fire({
+            title: 'Konfirmasi Status',
+            text: confirmText,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Ya, Ubah',
+            cancelButtonText: 'Batal'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                Swal.showLoading();
+                const res = await window.db.toggleEmployeeStatus(id, newStatus);
+                if (res.success) {
+                    Swal.fire('Berhasil', 'Status berhasil diubah', 'success');
+                    this.fetchMasterData();
+                } else Swal.fire('Error', res.error, 'error');
+            }
+        });
+    },
+
+    async deleteMaster(type, id) {
+        if (confirm(`Yakin ingin menghapus ${type} ini?`)) {
+            Swal.showLoading();
+            let res;
+            if (type === 'employee') res = await window.db.deleteEmployee(id);
+            if (type === 'product') res = await window.db.deleteProduct(id);
+            if (type === 'service') res = await window.db.deleteService(id);
+
+            if (res.success) {
+                Swal.close();
+                this.fetchMasterData();
+            } else {
+                Swal.fire('Gagal', res.error, 'error');
+            }
+        }
+    },
+
+    // ===================================
+    // KASIR & POS (PHASE 6)
+    // ===================================
+
+    async openPos(id) {
+        const booking = this.bookingsCache.find(b => b.id === id);
+        // Reset Modal State
+        this.posState.bookingId = id;
+        this.posState.capster = booking.barber_id;
+        this.posState.selectedProducts = [];
+        this.posState.servicePrice = 50000;
+
+        // Fetch Master Data
+        const srvData = await window.db.getServices();
+        if (srvData.success) {
+            this.posState.services = srvData.data;
+            if (booking.service_id) {
+                const matched = this.posState.services.find(s => s.name.toLowerCase() === booking.service_id.toLowerCase());
+                if (matched) this.posState.servicePrice = matched.price;
+            }
+        }
+        document.getElementById('pos-service-price').value = this.posState.servicePrice;
+
+        const prodData = await window.db.getProducts();
+        if (prodData.success) this.posState.allProducts = prodData.data;
+
+        const empData = await window.db.getEmployees();
+        if (empData.success) this.posState.employees = empData.data;
+
+        // Populate Actual Capster Dropdown
+        const capSelect = document.getElementById('pos-actual-capster');
+        if (capSelect) {
+            capSelect.innerHTML = '<option value="">-- Wajib Dipilih --</option>';
+            this.posState.employees.forEach(e => {
+                capSelect.innerHTML += `<option value="${e.name}">${e.name}</option>`;
+            });
+            // Select automatically if it's not "any"
+            if (booking.barber_id && booking.barber_id !== 'any') {
+                // Find matching employee by name (since value is name)
+                const matched = this.posState.employees.find(e => e.name.toLowerCase() === booking.barber_id.toLowerCase());
+                if (matched) capSelect.value = matched.name;
+                else capSelect.value = booking.barber_id;
+            }
+        }
+
+        // Render Info
+        document.getElementById('pos-booking-info').innerHTML = `
+            <p style="margin-bottom:0.2rem"><strong>Pelanggan:</strong> ${booking.customer_name} (${booking.customer_phone})</p>
+            <p style="margin-bottom:0.2rem"><strong>Layanan:</strong> ${(booking.service_id || 'Tanpa Layanan').toUpperCase()}</p>
+            <p><strong>Kapster:</strong> ${(booking.barber_id === 'any' ? 'Bebas' : (booking.barber_id || 'Tidak Ada').toUpperCase())}</p>
+        `;
+
+        const sel = document.getElementById('pos-product-select');
+        sel.innerHTML = '<option value="">-- Pilih Produk Fisik --</option>';
+        this.posState.allProducts.forEach(p => {
+            sel.innerHTML += `<option value="${p.id}">${p.name} - Rp ${p.price.toLocaleString()}</option>`;
+        });
+
+        this.renderPosProducts();
+        this.calcPosTotal();
+
+        document.getElementById('pos-modal').classList.add('active');
+    },
+
+    closePos() {
+        document.getElementById('pos-modal').classList.remove('active');
+    },
+
+    addPosProduct() {
+        const sel = document.getElementById('pos-product-select');
+        if (!sel.value) return;
+        const prod = this.posState.allProducts.find(p => p.id === sel.value);
+        if (prod) {
+            this.posState.selectedProducts.push(prod);
+            this.renderPosProducts();
+            this.calcPosTotal();
+        }
+    },
+
+    removePosProduct(index) {
+        this.posState.selectedProducts.splice(index, 1);
+        this.renderPosProducts();
+        this.calcPosTotal();
+    },
+
+    renderPosProducts() {
+        const list = document.getElementById('pos-product-list');
+        list.innerHTML = '';
+        if (this.posState.selectedProducts.length === 0) {
+            list.innerHTML = `<li style="color:var(--text-secondary); border-bottom:none;">Tidak ada produk tambahan</li>`;
+        }
+        this.posState.selectedProducts.forEach((p, idx) => {
+            list.innerHTML += `
+               <li>
+                   <span>${p.name} <small>(Rp ${p.price.toLocaleString()})</small></span>
+                   <button class="btn btn-sm btn-outline" style="color:red; border-color:red" onclick="adminLogic.removePosProduct(${idx})"><i class="ph ph-trash"></i></button>
+               </li>
+            `;
+        });
+    },
+
+    calcPosTotal() {
+        let total = parseInt(document.getElementById('pos-service-price').value) || 0;
+        this.posState.selectedProducts.forEach(p => total += parseFloat(p.price));
+        document.getElementById('pos-total').innerText = total.toLocaleString();
+        return total;
+    },
+
+    async submitPos() {
+        const actualCapster = document.getElementById('pos-actual-capster').value;
+        if (!actualCapster) {
+            Swal.fire('Perhatian', 'Mohon pilih "Kapster Bertugas" untuk kalkulasi komisi laporan!', 'warning');
+            return;
+        }
+
+        const totalAmount = this.calcPosTotal();
+        const basePrice = parseInt(document.getElementById('pos-service-price').value) || 0;
+
+        let commissionAmount = 0;
+        // Cari Master Pegawai sesuai Actual Barber Name
+        const emp = this.posState.employees.find(e => e.name.toLowerCase() === actualCapster.toLowerCase());
+
+        if (emp) {
+            if (emp.salary_type === 'percentage') {
+                commissionAmount = basePrice * (emp.salary_value / 100);
+            }
+        }
+
+        // Update booking DB actual barber jika berbeda/dari 'any'
+        if (this.posState.capster !== actualCapster) {
+            await window.db.updateBookingBarber(this.posState.bookingId, actualCapster);
+        }
+
+        const payload = {
+            booking_id: this.posState.bookingId,
+            total_amount: totalAmount,
+            commission_amount: commissionAmount,
+            items: this.posState.selectedProducts
+        };
+
+        Swal.showLoading();
+        const res = await window.db.createTransaction(payload);
+        if(res.success) {
+            this.closePos();
+            this.fetchData();
+            this.fetchLaporan();
+
+            // Generator Struk WhatsApp
+            const booking = this.bookingsCache.find(b => b.id === this.posState.bookingId);
+            let phone = booking.customer_phone || "";
+            
+            // Bypass Whatsapp prompt if it's a Walk-In without actual phone number
+            if (phone === '-' || phone === '') {
+                Swal.fire('Sukses!', 'Transaksi Tamu Walk-In selesai.', 'success');
+                return;
+            }
+
+            // Format phone to international if starts with 0
+            if(phone.startsWith('0')) phone = '62' + phone.substring(1);
+
+            let receipt = `🧾 *STRUK KASIR KAPPER'S BARBERSHOP* ✂️\n`;
+            receipt += `-----------------------------------\n`;
+            receipt += `Halo *${booking.customer_name}*,\n`;
+            receipt += `Terima kasih telah mempercayakan gaya rambutnya kepada kami!\n\n`;
+
+            receipt += `*Detail Layanan:*\n`;
+            receipt += `- ${booking.service_id || 'Layanan Reguler'} : Rp ${basePrice.toLocaleString('id-ID')}\n`;
+            receipt += `- Kapster : *${actualCapster}*\n\n`;
+
+            if (this.posState.selectedProducts.length > 0) {
+                receipt += `*Produk / Pomade:*\n`;
+                this.posState.selectedProducts.forEach(p => {
+                    receipt += `- ${p.name} : Rp ${parseInt(p.price).toLocaleString('id-ID')}\n`;
+                });
+                receipt += `\n`;
+            }
+
+            receipt += `💰 *TOTAL PEMBAYARAN : Rp ${totalAmount.toLocaleString('id-ID')}*\n`;
+            receipt += `-----------------------------------\n`;
+            receipt += `Tampil Maksimal Setiap Hari. Sampai jumpa lagi! 🔥`;
+
+            const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(receipt)}`;
+
+            Swal.fire({
+                title: 'Transaksi Berhasil! 🎉',
+                text: 'Pilih metode untuk memberikan struk bukti lunas:',
+                icon: 'success',
+                showDenyButton: true,
+                showCancelButton: true,
+                confirmButtonColor: '#25D366',
+                denyButtonColor: '#0f172a',
+                cancelButtonColor: '#64748B',
+                confirmButtonText: '<i class="ph ph-whatsapp-logo"></i> Kirim WA',
+                denyButtonText: '<i class="ph ph-printer"></i> Cetak Thermal',
+                cancelButtonText: 'Tutup Saja'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.open(waUrl, '_blank');
+                } else if (result.isDenied) {
+                    // Thermal Print Logic
+                    const printArea = document.getElementById('print-area');
+                    
+                    let html = `<div class="print-center">
+                        <strong style="font-size:16px;">KAPPER'S BARBERSHOP</strong><br>
+                        Premium Grooming<br>
+                        <div class="print-line"></div>
+                    </div>`;
+                    
+                    html += `<strong>Pelanggan:</strong> ${booking.customer_name}<br>`;
+                    html += `<strong>Kapster:</strong> ${actualCapster}<br>`;
+                    html += `<strong>Layanan:</strong><br>`;
+                    html += `<div class="print-flex"><span>${booking.service_id || 'Layanan Reguler'}</span><span>Rp ${basePrice.toLocaleString('id-ID')}</span></div>`;
+                    
+                    if (this.posState.selectedProducts.length > 0) {
+                        html += `<strong>Produk:</strong><br>`;
+                        this.posState.selectedProducts.forEach(p => {
+                            html += `<div class="print-flex"><span>${p.name}</span><span>Rp ${parseInt(p.price).toLocaleString('id-ID')}</span></div>`;
+                        });
+                    }
+                    
+                    html += `<div class="print-line"></div>`;
+                    html += `<div class="print-flex"><strong style="font-size:14px;">TOTAL:</strong> <strong style="font-size:14px;">Rp ${totalAmount.toLocaleString('id-ID')}</strong></div>`;
+                    html += `<div class="print-line"></div>`;
+                    html += `<div class="print-center"><small>Terima kasih atas kunjungan Anda!</small></div>`;
+
+                    printArea.innerHTML = html;
+                    window.print();
+                }
+            });
+
+        } else {
+            Swal.fire('Gagal Menyimpan Kasir', res.error, 'error');
+        }
+    },
+
+    // ===================================
+    // WALK-IN CUSTOMER FEATURE
+    // ===================================
+
+    async createWalkIn() {
+        Swal.showLoading();
+        const srvRes = await window.db.getServices();
+        const empRes = await window.db.getEmployees();
+        Swal.close();
+        
+        let srvOptions = '';
+        if(srvRes.success) srvRes.data.forEach(s => srvOptions += `<option value="${s.name}">${s.name}</option>`);
+        
+        let empOptions = '<option value="any">Bebas / Random</option>';
+        if(empRes.success) empRes.data.forEach(e => empOptions += `<option value="${e.name}">${e.name}</option>`);
+
+        Swal.fire({
+            title: 'Tamu Walk-In 🚶‍♂️',
+            html: `
+                <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:1rem;">Otomatis membuat antrean dan langsung masuk ke sistem Kasir.</p>
+                <input id="swal-wi-name" class="swal2-input" placeholder="Nama Pelanggan (Boleh Kosong)" value="Tamu Walk-In" style="height:2.5rem; font-size:1rem;">
+                <select id="swal-wi-service" class="swal2-select" style="display:flex; width:70%; margin:1em auto; font-size:1rem; padding:0.5rem">
+                    ${srvOptions}
+                </select>
+                <select id="swal-wi-barber" class="swal2-select" style="display:flex; width:70%; margin:1em auto; font-size:1rem; padding:0.5rem">
+                    ${empOptions}
+                </select>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Buat & Lanjut Kasir',
+            cancelButtonText: 'Batal',
+            preConfirm: () => {
+                return {
+                    name: document.getElementById('swal-wi-name').value || 'Tamu Walk-In',
+                    service: document.getElementById('swal-wi-service').value,
+                    barber: document.getElementById('swal-wi-barber').value
+                }
+            }
+        }).then(async (res) => {
+            if(res.isConfirmed) {
+                const vals = res.value;
+                const d = new Date();
+                const dString = d.toISOString().split("T")[0];
+                const hString = d.getHours().toString().padStart(2, '0') + ':00';
+
+                const payload = {
+                    service_id: vals.service,
+                    barber_id: vals.barber,
+                    booking_date: dString,
+                    time_slot: hString,
+                    customer_name: vals.name,
+                    customer_phone: '-',
+                    status: 'pending' // Assign directly to pending so admin can checkout
+                };
+
+                Swal.showLoading();
+                const insertRes = await window.db.insertBooking(payload);
+                if(insertRes.success && insertRes.data) {
+                    await this.fetchData();
+                    const newId = insertRes.data[0].id;
+                    this.openPos(newId);
+                } else {
+                    Swal.fire('Gagal Menyimpan', insertRes.error || "Gagal database", 'error');
+                }
+            }
+        });
+    },
+
+    // ===================================
+    // LAPORAN KEUANGAN (PHASE 6)
+    // ===================================
+
+    async fetchLaporan() {
+        if (!window.db) return;
+        const res = await window.db.getTransactions();
+        const expRes = await window.db.getExpenses();
+
+        const tbody = document.getElementById('lap-table-body');
+        const capBody = document.getElementById('lap-capster-body');
+
+        if (!res.success) {
+            tbody.innerHTML = `<tr><td colspan="5" style="color:red; text-align:center;">${res.error}</td></tr>`;
+            return;
+        }
+
+        let data = res.data;
+        let expData = expRes.success ? expRes.data : [];
+
+        // Apply Month Filter if selected
+        const filterMonth = document.getElementById('lap-filter-month');
+        if (filterMonth && filterMonth.value) {
+            // filterMonth.value is "YYYY-MM" (e.g. "2026-04")
+            data = data.filter(trx => trx.created_at.startsWith(filterMonth.value));
+            expData = expData.filter(exp => exp.expense_date.startsWith(filterMonth.value));
+        }
+        let totalOmzet = 0;
+        let totalKomisi = 0;
+        let totalPengeluaran = 0;
+        const capsterStats = {};
+
+        tbody.innerHTML = '';
+        capBody.innerHTML = '';
+
+        if (data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;">Belum ada riwayat pemasukan.</td></tr>`;
+            capBody.innerHTML = `<tr><td colspan="3" style="text-align:center;">Belum ada rekap.</td></tr>`;
+        } else {
+            data.forEach(trx => {
+                totalOmzet += parseFloat(trx.total_amount);
+                totalKomisi += parseFloat(trx.commission_amount);
+
+                let itemsStr = '-';
+                if (trx.items && trx.items.length > 0) {
+                    itemsStr = trx.items.map(i => i.name).join(', ');
+                }
+
+                // Ekstraksi Database Relasional (Supabase Join)
+                let serviceObj = trx.bookings ? (trx.bookings.service_id || 'N/A') : 'N/A';
+                let barberObj = trx.bookings ? (trx.bookings.barber_id || 'Unknown') : 'Unknown';
+                if (barberObj === 'any') barberObj = 'Bebas / Random';
+
+                // Tabulasi Kinerja Kapster
+                if (!capsterStats[barberObj]) {
+                    capsterStats[barberObj] = { count: 0, commission: 0 };
+                }
+                capsterStats[barberObj].count += 1;
+                capsterStats[barberObj].commission += parseFloat(trx.commission_amount);
+
+                const d = new Date(trx.created_at);
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${d.toLocaleDateString()}<br><small style="color:var(--text-secondary)">${d.toLocaleTimeString()}</small></td>
+                    <td><strong>${barberObj.toUpperCase()}</strong><br><small style="color:var(--text-secondary)">${serviceObj.toUpperCase()}</small></td>
+                    <td style="color:var(--text-primary); font-weight:600">Rp ${parseFloat(trx.total_amount).toLocaleString()}</td>
+                    <td style="color:#ef4444">Rp ${parseFloat(trx.commission_amount).toLocaleString()}</td>
+                    <td><small>${itemsStr}</small></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Render Tabel Capster Stats
+            Object.keys(capsterStats).forEach(capsterName => {
+                const stat = capsterStats[capsterName];
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong style="color:var(--text-primary)">${capsterName.toUpperCase()}</strong></td>
+                    <td><span class="status completed">${stat.count} Pelanggan</span></td>
+                    <td style="color:var(--accent-color); font-weight:600">Rp ${stat.commission.toLocaleString()}</td>
+                `;
+                capBody.appendChild(tr);
+            });
+        }
+
+        // Render Expenses
+        const expBody = document.getElementById('lap-expense-body');
+        if (expBody) {
+            expBody.innerHTML = '';
+            if (expData.length === 0) {
+                expBody.innerHTML = `<tr><td colspan="4" style="text-align:center;">Belum ada pengeluaran.</td></tr>`;
+            } else {
+                expData.forEach(exp => {
+                    totalPengeluaran += parseFloat(exp.amount);
+                    const d = new Date(exp.expense_date);
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${d.toLocaleDateString()}</td>
+                        <td><strong>${exp.description}</strong></td>
+                        <td style="color:#f97316; font-weight:600">Rp ${parseFloat(exp.amount).toLocaleString()}</td>
+                        <td><button class="btn btn-outline btn-sm action-btn" onclick="adminLogic.deleteExpense('${exp.id}')" style="color:red; border-color:red"><i class="ph ph-trash"></i></button></td>
+                    `;
+                    expBody.appendChild(tr);
+                });
+            }
+        }
+
+        const profit = totalOmzet - totalKomisi - totalPengeluaran;
+        document.getElementById('lap-omzet').innerText = `Rp ${totalOmzet.toLocaleString()}`;
+        document.getElementById('lap-komisi').innerText = `Rp ${totalKomisi.toLocaleString()}`;
+        
+        const elPengeluaran = document.getElementById('lap-pengeluaran');
+        if(elPengeluaran) elPengeluaran.innerText = `Rp ${totalPengeluaran.toLocaleString()}`;
+        
+        document.getElementById('lap-profit').innerText = `Rp ${profit.toLocaleString()}`;
+    },
+
+    async deleteExpense(id) {
+        if (confirm(`Yakin ingin menghapus pengeluaran ini?`)) {
+            Swal.showLoading();
+            const res = await window.db.deleteExpense(id);
+            if (res.success) {
+                Swal.close();
+                this.fetchLaporan();
+            } else {
+                Swal.fire('Gagal', res.error, 'error');
+            }
+        }
+    },
+
+    // ================== GALLERY ENGINE ==================
+    async fetchGalleryData() {
+        if (!window.db || !document.getElementById('gallery-admin-grid')) return;
+        const res = await window.db.getGallery();
+        const grid = document.getElementById('gallery-admin-grid');
+        if (res.success) {
+            grid.innerHTML = '';
+            if (res.data.length === 0) {
+                grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-secondary);">Belum ada foto galeri.</div>`;
+            } else {
+                res.data.forEach(img => {
+                    grid.innerHTML += `
+                        <div style="background:var(--bg-primary); padding:0.5rem; border:1px solid var(--border-light); border-radius:var(--radius-sm); text-align:center;">
+                            <img src="${img.image_url}" alt="${img.title}" style="width:100%; height:180px; object-fit:cover; border-radius:var(--radius-sm); margin-bottom:0.5rem; border:1px solid rgba(0,0,0,0.1);">
+                            <strong style="display:block; margin-bottom:0.5rem; font-size:0.95rem; color:var(--text-primary);">${img.title}</strong>
+                            <button class="btn btn-outline btn-sm action-btn" onclick="adminLogic.deleteGallery('${img.id}')" style="color:red; border-color:red; width:100%;"><i class="ph ph-trash"></i> Hapus Foto</button>
+                        </div>
+                    `;
+                });
+            }
+        }
+    },
+
+    async addGalleryMaster() {
+        const { value: formValues } = await Swal.fire({
+            title: 'Upload Foto Galeri',
+            html:
+                `<div style="text-align:left; font-size:0.9rem; margin-bottom:0.5rem;">Judul Potongan (Misal: French Crop):</div>` +
+                '<input id="swal-img-title" class="swal2-input" placeholder="Nama Gaya Rambut" style="margin-top:0;">' +
+                `<div style="text-align:left; font-size:0.9rem; margin-top:1rem; margin-bottom:0.5rem;">Link URL Gambar:</div>` +
+                '<input id="swal-img-url" class="swal2-input" placeholder="https://..." style="margin-top:0;">',
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: '<i class="ph ph-upload-simple"></i> Simpan',
+            cancelButtonText: 'Batal',
+            preConfirm: () => {
+                const title = document.getElementById('swal-img-title').value;
+                const url = document.getElementById('swal-img-url').value;
+                if (!title || !url) {
+                    Swal.showValidationMessage('Semua kolom wajib diisi');
+                }
+                return { title, image_url: url };
+            }
+        });
+
+        if (formValues) {
+            Swal.showLoading();
+            const res = await window.db.addGalleryItem({
+                title: formValues.title,
+                image_url: formValues.image_url
+            });
+            if (res.success) {
+                Swal.fire('Berhasil', 'Foto galeri berhasil diupload', 'success');
+                this.fetchGalleryData();
+            } else {
+                Swal.fire('Error', res.error, 'error');
+            }
+        }
+    },
+
+    async deleteGallery(id) {
+        if (confirm('Yakin ingin menghapus foto portofolio ini dari Landing Page?')) {
+            Swal.showLoading();
+            const res = await window.db.deleteGalleryItem(id);
+            if (res.success) {
+                Swal.close();
+                this.fetchGalleryData();
+            } else Swal.fire('Error', res.error, 'error');
+        }
+    }
+};

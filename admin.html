@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Kapper's</title>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- Global CSS and Admin Context CSS -->
+    <link rel="stylesheet" href="./css/style.css">
+    <link rel="stylesheet" href="./css/admin.css">
+</head>
+
+<body class="admin-body">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2>Kapper's Admin</h2>
+        </div>
+        <ul class="sidebar-menu" id="admin-sidebar">
+            <li class="active"><a href="#" data-target="tab-dashboard"><i class="ph ph-calendar-check"></i> Bookings &
+                    Kasir</a></li>
+            <li><a href="#" data-target="tab-master"><i class="ph ph-database"></i> Master Data</a></li>
+            <li><a href="#" data-target="tab-galeri"><i class="ph ph-image"></i> Galeri Web</a></li>
+            <li><a href="#" data-target="tab-laporan"><i class="ph ph-chart-line-up"></i> Laporan Keuangan</a></li>
+            <div style="margin: 2rem 0; border-top: 1px solid var(--border-light);"></div>
+            <li><a href="index.html"><i class="ph ph-arrow-u-up-left"></i> Halaman Web</a></li>
+            <li><a href="#" id="btn-logout" style="color:var(--text-secondary);"><i class="ph ph-sign-out"></i>
+                    Logout</a></li>
+        </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-content">
+        <!-- Mobile Header (Hidden on Desktop) -->
+        <div class="admin-mobile-header">
+            <h2>Kapper's Admin</h2>
+            <button id="btn-mobile-sidebar" class="btn btn-outline" style="padding:0.5rem 0.8rem;"><i class="ph ph-list"
+                    style="font-size:1.5rem"></i></button>
+        </div>
+
+        <!-- ======================= -->
+        <!-- TAB 1: DASHBOARD / BOOKINGS -->
+        <!-- ======================= -->
+        <section id="tab-dashboard" class="tab-content active">
+            <header class="admin-topbar">
+                <div>
+                    <h1 class="page-title">Appointment Management</h1>
+                    <p>Pantau dan atur seluruh reservasi barbershop Anda disini.</p>
+                </div>
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="btn btn-outline" onclick="adminLogic.createWalkIn()"><i class="ph ph-user-plus"></i>
+                        Tamu Walk-In</button>
+                    <button class="btn btn-primary" onclick="adminLogic.fetchData()"><i
+                            class="ph ph-arrows-clockwise"></i> Refresh</button>
+                </div>
+            </header>
+
+            <section class="dashboard-stats">
+                <div class="stat-card">
+                    <i class="ph ph-users"></i>
+                    <div class="sc-info">
+                        <h3 id="stat-total">0</h3>
+                        <span>Total Booking</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <i class="ph ph-clock"></i>
+                    <div class="sc-info">
+                        <h3 id="stat-pending">0</h3>
+                        <span>Menunggu (Pending)</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <i class="ph ph-check-circle"></i>
+                    <div class="sc-info">
+                        <h3 id="stat-completed">0</h3>
+                        <span>Selesai (Completed)</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Bookings Table -->
+            <section class="table-container glass">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>TANGGAL & JAM</th>
+                            <th>PELANGGAN</th>
+                            <th>LAYANAN</th>
+                            <th>CAPSTER</th>
+                            <th>STATUS</th>
+                            <th>AKSI</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bookings-table-body">
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 3rem;">Memuat data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+        </section>
+
+        <!-- ======================= -->
+        <!-- TAB 2: MASTER DATA -->
+        <!-- ======================= -->
+        <section id="tab-master" class="tab-content">
+            <header class="admin-topbar">
+                <div>
+                    <h1 class="page-title">Master Data</h1>
+                    <p>Atur daftar Kapster, Layanan, dan Produk Fisik (Pomade) disini.</p>
+                </div>
+            </header>
+
+            <div class="dashboard-stats"
+                style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+                <!-- Employee Card -->
+                <div class="table-container glass" style="padding: 1.5rem">
+                    <h2 style="margin-bottom:1rem; font-size:1.25rem;"> Pegawai / Kapster</h2>
+                    <form id="form-employee" style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap: wrap;">
+                        <input type="text" id="emp-name" class="form-control" placeholder="Nama Kapster" required
+                            style="flex:1; min-width: 150px;">
+                        <input type="text" id="emp-role" class="form-control" placeholder="Jabatan (Opsional)"
+                            style="flex:1; min-width: 150px;">
+                        <input type="text" id="emp-ig" class="form-control" placeholder="ID IG (Opsional)"
+                            style="flex:1; min-width: 150px;">
+                        <input type="text" id="emp-tiktok" class="form-control" placeholder="ID TikTok (Opsional)"
+                            style="flex:1; min-width: 150px;">
+                        <select id="emp-type" class="form-control" style="flex:1; min-width: 150px;">
+                            <option value="percentage">Sistem Bagi Hasil (%)</option>
+                            <option value="fixed">Gaji Pokok (Rp)</option>
+                        </select>
+                        <input type="number" id="emp-value" class="form-control" placeholder="Nominal" required
+                            style="width: 110px;">
+                        <button type="submit" class="btn btn-primary" title="Tambah Kapster"><i
+                                class="ph ph-plus"></i></button>
+                    </form>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>NAMA</th>
+                                <th>SKEMA GAJI</th>
+                                <th>AKSI</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-employees">
+                            <tr>
+                                <td colspan="3" style="text-align:center;">Memuat data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Service Card -->
+                <div class="table-container glass" style="padding: 1.5rem">
+                    <h2 style="margin-bottom:1rem; font-size:1.25rem;"> Layanan & Paket</h2>
+                    <form id="form-service" style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap: wrap;">
+                        <input type="text" id="srv-name" class="form-control" placeholder="Cth: Premium Haircut"
+                            required style="flex:1; min-width: 150px;">
+                        <input type="text" id="srv-desc" class="form-control"
+                            placeholder="Deskripsi (Cth: Haircut & Wash)" style="flex:2; min-width: 200px;">
+                        <input type="number" id="srv-price" class="form-control" placeholder="Harga (Rp)" required
+                            style="width: 130px;">
+                        <button type="submit" class="btn btn-primary" title="Tambah Layanan"><i
+                                class="ph ph-plus"></i></button>
+                    </form>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>LAYANAN</th>
+                                <th>HARGA</th>
+                                <th>AKSI</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-services">
+                            <tr>
+                                <td colspan="3" style="text-align:center;">Memuat data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Product Card -->
+                <div class="table-container glass" style="padding: 1.5rem">
+                    <h2 style="margin-bottom:1rem; font-size:1.25rem;"> Produk & Pomade</h2>
+                    <form id="form-product" style="display:flex; gap:0.5rem; margin-bottom:1rem;">
+                        <input type="text" id="prod-name" class="form-control" placeholder="Nama Produk" required>
+                        <input type="number" id="prod-price" class="form-control" placeholder="Harga (Rp)" required
+                            style="width: 150px;">
+                        <input type="number" id="prod-stock" class="form-control" placeholder="Stok" value="10" required
+                            style="width: 80px;">
+                        <button type="submit" class="btn btn-primary" title="Tambah Produk"><i
+                                class="ph ph-plus"></i></button>
+                    </form>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>PRODUK</th>
+                                <th>HARGA</th>
+                                <th>STOK</th>
+                                <th>AKSI</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-products">
+                            <tr>
+                                <td colspan="4" style="text-align:center;">Memuat data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================= -->
+        <!-- TAB 3: LAPORAN KEUANGAN -->
+        <!-- ======================= -->
+        <section id="tab-laporan" class="tab-content">
+            <header class="admin-topbar">
+                <div>
+                    <h1 class="page-title"> Laporan Keuangan</h1>
+                    <p>Kalkulasi Laba Kotor, Omzet Pembayaran, dan Beban Komisi Kapster secara otomatis.</p>
+                </div>
+                <div style="display:flex; gap:0.5rem; align-items:center;">
+                    <input type="month" id="lap-filter-month" class="form-control" title="Filter Periode Waktu"
+                        onchange="adminLogic.fetchLaporan()">
+                    <button class="btn btn-outline" onclick="adminLogic.fetchLaporan()" title="Perbarui"><i
+                            class="ph ph-arrows-clockwise"></i></button>
+                </div>
+            </header>
+
+            <div class="dashboard-stats" style="margin-bottom: 2rem;">
+                <!-- Total Omzet -->
+                <div class="stat-card glass" style="border-left: 4px solid var(--accent-color);">
+                    <div class="stat-icon"><i class="ph ph-money"></i></div>
+                    <div class="stat-info">
+                        <h3>Total Omzet (Pendapatan)</h3>
+                        <p class="stat-number" id="lap-omzet">Rp 0</p>
+                    </div>
+                </div>
+
+                <!-- Total Komisi -->
+                <div class="stat-card glass" style="border-left: 4px solid #ef4444;">
+                    <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;"><i
+                            class="ph ph-users"></i></div>
+                    <div class="stat-info">
+                        <h3>Beban Gaji (Komisi)</h3>
+                        <p class="stat-number" id="lap-komisi" style="color: #ef4444">Rp 0</p>
+                    </div>
+                </div>
+
+                <!-- Pengeluaran Operasional -->
+                <div class="stat-card glass" style="border-left: 4px solid #f97316;">
+                    <div class="stat-icon" style="background: rgba(249, 115, 22, 0.1); color: #f97316;"><i
+                            class="ph ph-receipt"></i></div>
+                    <div class="stat-info">
+                        <h3>Pengeluaran Operasional</h3>
+                        <p class="stat-number" id="lap-pengeluaran" style="color: #f97316">Rp 0</p>
+                    </div>
+                </div>
+
+                <!-- Laba Bersih/Kotor -->
+                <div class="stat-card glass" style="border-left: 4px solid #22c55e;">
+                    <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;"><i
+                            class="ph ph-trend-up"></i></div>
+                    <div class="stat-info">
+                        <h3>Laba Bersih (Net Profit)</h3>
+                        <p class="stat-number" id="lap-profit" style="color: #22c55e">Rp 0</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-stats" style="grid-template-columns: 1fr; margin-bottom:2rem;">
+                <div class="table-container glass">
+                    <h2 style="margin-bottom:1rem; padding:1.5rem 1.5rem 0; font-size:1.25rem;"> Rekap Kinerja & Gaji
+                        Kapster</h2>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>NAMA KAPSTER</th>
+                                <th>TOTAL CUKUR (KEPALA)</th>
+                                <th>KOMISI DIDAPAT (RP)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lap-capster-body">
+                            <tr>
+                                <td colspan="3" style="text-align:center;">Memuat Data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="table-container glass" style="margin-bottom: 2rem;">
+                <h2 style="margin-bottom:1rem; padding:1.5rem 1.5rem 0; font-size:1.25rem;"> Pengeluaran Operasional
+                </h2>
+                <form id="form-expense"
+                    style="display:flex; gap:0.5rem; margin-bottom:1rem; padding: 0 1.5rem; flex-wrap: wrap;">
+                    <input type="text" id="exp-desc" class="form-control" placeholder="Deskripsi (Cth: Beli Sapu)"
+                        required style="flex:2; min-width: 200px;">
+                    <input type="number" id="exp-amount" class="form-control" placeholder="Nominal (Rp)" required
+                        style="width: 150px;">
+                    <input type="date" id="exp-date" class="form-control" required style="width: 150px;"
+                        title="Tanggal Pengeluaran">
+                    <button type="submit" class="btn btn-primary" title="Tambah Pengeluaran"><i
+                            class="ph ph-plus"></i></button>
+                </form>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>TANGGAL</th>
+                            <th>DESKRIPSI PENGELUARAN</th>
+                            <th>NOMINAL (RP)</th>
+                            <th>AKSI</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lap-expense-body">
+                        <tr>
+                            <td colspan="4" style="text-align:center;">Memuat Riwayat Pengeluaran...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="table-container glass">
+                <h2 style="margin-bottom:1rem; padding:1.5rem 1.5rem 0; font-size:1.25rem;"> Riwayat Transaksi Lengkap
+                </h2>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>WAKTU</th>
+                            <th>KAPSTER & LAYANAN</th>
+                            <th>TOTAL TAGIHAN</th>
+                            <th>KOMISI KAPSTER</th>
+                            <th>PRODUK FISIK</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lap-table-body">
+                        <tr>
+                            <td colspan="5" style="text-align:center;">Memuat Riwayat...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            </div>
+        </section>
+
+        <!-- ======================= -->
+        <!-- TAB 4: GALERI PORTFOLIO -->
+        <!-- ======================= -->
+        <section id="tab-galeri" class="tab-content">
+            <header class="admin-topbar">
+                <div>
+                    <h1 class="page-title">Galeri Portofolio Web</h1>
+                    <p>Kelola dan pamerkan foto hasil potongan rambut terbaik Anda.</p>
+                </div>
+                <div>
+                    <button class="btn btn-primary" onclick="adminLogic.addGalleryMaster()"><i class="ph ph-plus"></i> Upload Foto Baru</button>
+                    <button class="btn btn-outline" onclick="adminLogic.fetchGalleryData()"><i class="ph ph-arrows-clockwise"></i> Refresh</button>
+                </div>
+            </header>
+
+            <div class="table-container glass" style="margin-bottom: 2rem; padding: 1.5rem;">
+                <div id="gallery-admin-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.5rem;">
+                    <div style="grid-column: 1 / -1; text-align: center; color: var(--text-secondary);">Memuat Galeri...</div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- POS / Kasir Modal -->
+    <div id="pos-modal" class="modal-overlay">
+        <div class="modal-card">
+            <h2 style="margin-bottom:1rem;"> Penyelesaian & Kasir</h2>
+            <div id="pos-booking-info"
+                style="margin-bottom:1rem; padding-bottom:1rem; border-bottom:1px solid var(--border-light)"></div>
+
+            <div class="form-group" style="text-align: left;">
+                <label>Konfirmasi Kapster Bertugas</label>
+                <select id="pos-actual-capster" class="form-control" style="margin-bottom:0.5rem;"></select>
+                <small style="color:var(--text-secondary)">Pastikan sesuai agar komisi masuk ke orang yang tepat
+                    terutama jika opsi Bebas dipilih.</small>
+            </div>
+
+            <div class="form-group" style="text-align: left;">
+                <label>Pendapatan Layanan (Rp)</label>
+                <input type="number" id="pos-service-price" class="form-control" value="50000"
+                    onchange="adminLogic.calcPosTotal()">
+            </div>
+
+            <div class="form-group" style="text-align: left;">
+                <label>Tambah Penjualan Produk Fisik (Opsional)</label>
+                <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
+                    <select id="pos-product-select" class="form-control"></select>
+                    <button class="btn btn-outline" type="button" onclick="adminLogic.addPosProduct()"><i
+                            class="ph ph-plus"></i></button>
+                </div>
+                <ul id="pos-product-list"
+                    style="list-style:none; padding:1rem; background:var(--bg-tertiary); border-radius:var(--radius-sm); min-height:50px;">
+                </ul>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2rem;">
+                <h3 style="color:var(--text-primary)">Total: <span id="pos-total" style="color:var(--accent-color)">Rp
+                        50,000</span></h3>
+                <div style="display:flex; gap: 0.5rem;">
+                    <button class="btn btn-outline" onclick="adminLogic.closePos()">Batal</button>
+                    <button class="btn btn-primary" onclick="adminLogic.submitPos()">Tagih & Selesai</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Print Area for Thermal Receipts -->
+    <div id="print-area"></div>
+
+    <!-- Supabase CDN and Admin Logic -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./js/supabase.js"></script>
+    <script src="./js/admin.js"></script>
+</body>
+
+</html>
