@@ -34,11 +34,26 @@ const adminLogic = {
                 window.location.replace("login.html");
                 return;
             }
-            
+
             // Check Admin Role
             const ADMIN_EMAILS = ['owner@barber.com'];
             if (session.user && ADMIN_EMAILS.includes(session.user.email)) {
                 isAdmin = true;
+            }
+
+            // Update Greeting UI
+            const elGreeting = document.getElementById('user-greeting');
+            if (elGreeting) {
+                if (isAdmin) {
+                    elGreeting.innerText = "Sang Owner";
+                } else {
+                    let userName = "Staf Kasir";
+                    if (session.user && session.user.email) {
+                        const prefix = session.user.email.split('@')[0];
+                        userName = prefix.charAt(0).toUpperCase() + prefix.slice(1);
+                    }
+                    elGreeting.innerText = `${userName}`;
+                }
             }
         }
 
@@ -48,17 +63,17 @@ const adminLogic = {
             const mMaster = document.querySelector('[data-target="tab-master"]');
             const mLaporan = document.querySelector('[data-target="tab-laporan"]');
             const mGaleri = document.querySelector('[data-target="tab-galeri"]');
-            if(mMaster) mMaster.parentElement.style.display = 'none';
-            if(mLaporan) mLaporan.parentElement.style.display = 'none';
-            if(mGaleri) mGaleri.parentElement.style.display = 'none';
-            
+            if (mMaster) mMaster.parentElement.style.display = 'none';
+            if (mLaporan) mLaporan.parentElement.style.display = 'none';
+            if (mGaleri) mGaleri.parentElement.style.display = 'none';
+
             // Remove the tabs entirely from DOM
             const tabMaster = document.getElementById('tab-master');
             const tabLaporan = document.getElementById('tab-laporan');
             const tabGaleri = document.getElementById('tab-galeri');
-            if(tabMaster) tabMaster.remove();
-            if(tabLaporan) tabLaporan.remove();
-            if(tabGaleri) tabGaleri.remove();
+            if (tabMaster) tabMaster.remove();
+            if (tabLaporan) tabLaporan.remove();
+            if (tabGaleri) tabGaleri.remove();
         }
 
         // Setup Tab Navigation Logic
@@ -71,7 +86,7 @@ const adminLogic = {
 
         // Fetch Data for both roles
         await this.fetchData();
-        
+
         // Fetch Admin-only Data
         if (isAdmin) {
             await this.fetchMasterData();
@@ -88,7 +103,7 @@ const adminLogic = {
             });
             // Close sidebar when clicking outside (in mobile view)
             document.addEventListener('click', (e) => {
-                if(window.innerWidth <= 992 && !sidebar.contains(e.target) && !btnSidebar.contains(e.target)) {
+                if (window.innerWidth <= 992 && !sidebar.contains(e.target) && !btnSidebar.contains(e.target)) {
                     sidebar.classList.remove('active');
                 }
             });
@@ -142,7 +157,7 @@ const adminLogic = {
                     targetTab.classList.add('active');
                 }
                 // Hide source sidebar on mobile
-                if(window.innerWidth <= 992) {
+                if (window.innerWidth <= 992) {
                     document.querySelector('.sidebar').classList.remove('active');
                 }
             });
@@ -408,8 +423,8 @@ const adminLogic = {
                 <input id="edit-emp-ig" class="swal2-input" value="${item.ig_username || ''}" placeholder="Username IG (Opsional)" style="width:80%">
                 <input id="edit-emp-tiktok" class="swal2-input" value="${item.tiktok_username || ''}" placeholder="Username TikTok (Opsional)" style="width:80%">
                 <select id="edit-emp-type" class="swal2-select" style="width:80%">
-                    <option value="percentage" ${item.salary_type==='percentage'?'selected':''}>Sistem Bagi Hasil (%)</option>
-                    <option value="fixed" ${item.salary_type==='fixed'?'selected':''}>Gaji Pokok (Rp)</option>
+                    <option value="percentage" ${item.salary_type === 'percentage' ? 'selected' : ''}>Sistem Bagi Hasil (%)</option>
+                    <option value="fixed" ${item.salary_type === 'fixed' ? 'selected' : ''}>Gaji Pokok (Rp)</option>
                 </select>
                 <input id="edit-emp-value" type="number" class="swal2-input" value="${item.salary_value}" placeholder="Nominal" style="width:80%">
             `;
@@ -475,7 +490,7 @@ const adminLogic = {
     async toggleMaster(id, currentStatus) {
         const newStatus = !currentStatus;
         const confirmText = newStatus ? 'Aktifkan Kapster ini?' : 'Set Kapster ini menjadi Libur / Off?';
-        
+
         Swal.fire({
             title: 'Konfirmasi Status',
             text: confirmText,
@@ -654,7 +669,7 @@ const adminLogic = {
 
         Swal.showLoading();
         const res = await window.db.createTransaction(payload);
-        if(res.success) {
+        if (res.success) {
             this.closePos();
             this.fetchData();
             this.fetchLaporan();
@@ -662,7 +677,7 @@ const adminLogic = {
             // Generator Struk WhatsApp
             const booking = this.bookingsCache.find(b => b.id === this.posState.bookingId);
             let phone = booking.customer_phone || "";
-            
+
             // Bypass Whatsapp prompt if it's a Walk-In without actual phone number
             if (phone === '-' || phone === '') {
                 Swal.fire('Sukses!', 'Transaksi Tamu Walk-In selesai.', 'success');
@@ -670,7 +685,7 @@ const adminLogic = {
             }
 
             // Format phone to international if starts with 0
-            if(phone.startsWith('0')) phone = '62' + phone.substring(1);
+            if (phone.startsWith('0')) phone = '62' + phone.substring(1);
 
             let receipt = `🧾 *STRUK KASIR KAPPER'S BARBERSHOP* ✂️\n`;
             receipt += `-----------------------------------\n`;
@@ -713,25 +728,25 @@ const adminLogic = {
                 } else if (result.isDenied) {
                     // Thermal Print Logic
                     const printArea = document.getElementById('print-area');
-                    
+
                     let html = `<div class="print-center">
                         <strong style="font-size:16px;">KAPPER'S BARBERSHOP</strong><br>
                         Premium Grooming<br>
                         <div class="print-line"></div>
                     </div>`;
-                    
+
                     html += `<strong>Pelanggan:</strong> ${booking.customer_name}<br>`;
                     html += `<strong>Kapster:</strong> ${actualCapster}<br>`;
                     html += `<strong>Layanan:</strong><br>`;
                     html += `<div class="print-flex"><span>${booking.service_id || 'Layanan Reguler'}</span><span>Rp ${basePrice.toLocaleString('id-ID')}</span></div>`;
-                    
+
                     if (this.posState.selectedProducts.length > 0) {
                         html += `<strong>Produk:</strong><br>`;
                         this.posState.selectedProducts.forEach(p => {
                             html += `<div class="print-flex"><span>${p.name}</span><span>Rp ${parseInt(p.price).toLocaleString('id-ID')}</span></div>`;
                         });
                     }
-                    
+
                     html += `<div class="print-line"></div>`;
                     html += `<div class="print-flex"><strong style="font-size:14px;">TOTAL:</strong> <strong style="font-size:14px;">Rp ${totalAmount.toLocaleString('id-ID')}</strong></div>`;
                     html += `<div class="print-line"></div>`;
@@ -756,12 +771,12 @@ const adminLogic = {
         const srvRes = await window.db.getServices();
         const empRes = await window.db.getEmployees();
         Swal.close();
-        
+
         let srvOptions = '';
-        if(srvRes.success) srvRes.data.forEach(s => srvOptions += `<option value="${s.name}">${s.name}</option>`);
-        
+        if (srvRes.success) srvRes.data.forEach(s => srvOptions += `<option value="${s.name}">${s.name}</option>`);
+
         let empOptions = '<option value="any">Bebas / Random</option>';
-        if(empRes.success) empRes.data.forEach(e => empOptions += `<option value="${e.name}">${e.name}</option>`);
+        if (empRes.success) empRes.data.forEach(e => empOptions += `<option value="${e.name}">${e.name}</option>`);
 
         Swal.fire({
             title: 'Tamu Walk-In 🚶‍♂️',
@@ -786,7 +801,7 @@ const adminLogic = {
                 }
             }
         }).then(async (res) => {
-            if(res.isConfirmed) {
+            if (res.isConfirmed) {
                 const vals = res.value;
                 const d = new Date();
                 const dString = d.toISOString().split("T")[0];
@@ -804,7 +819,7 @@ const adminLogic = {
 
                 Swal.showLoading();
                 const insertRes = await window.db.insertBooking(payload);
-                if(insertRes.success && insertRes.data) {
+                if (insertRes.success && insertRes.data) {
                     await this.fetchData();
                     const newId = insertRes.data[0].id;
                     this.openPos(newId);
@@ -925,10 +940,10 @@ const adminLogic = {
         const profit = totalOmzet - totalKomisi - totalPengeluaran;
         document.getElementById('lap-omzet').innerText = `Rp ${totalOmzet.toLocaleString()}`;
         document.getElementById('lap-komisi').innerText = `Rp ${totalKomisi.toLocaleString()}`;
-        
+
         const elPengeluaran = document.getElementById('lap-pengeluaran');
-        if(elPengeluaran) elPengeluaran.innerText = `Rp ${totalPengeluaran.toLocaleString()}`;
-        
+        if (elPengeluaran) elPengeluaran.innerText = `Rp ${totalPengeluaran.toLocaleString()}`;
+
         document.getElementById('lap-profit').innerText = `Rp ${profit.toLocaleString()}`;
     },
 
