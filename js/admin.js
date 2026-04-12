@@ -71,6 +71,12 @@ const adminLogic = {
                 if (tab) tab.remove();
             });
 
+            // Hide master data forms for Kasir (read-only mode)
+            ['form-service', 'form-employee', 'form-product'].forEach(fId => {
+                const form = document.getElementById(fId);
+                if (form) form.style.display = 'none';
+            });
+
             // Set role label
             const roleEl = document.getElementById('user-role');
             if (roleEl) roleEl.innerText = 'Staf Kasir';
@@ -89,12 +95,12 @@ const adminLogic = {
         const globalFetches = [
             this.fetchData(),
             this.fetchPelanggan(),
-            this.loadSettings()
+            this.loadSettings(),
+            this.fetchMasterData() // Load for ALL users (Kasir sees read-only)
         ];
 
         if (isAdmin) {
             globalFetches.push(
-                this.fetchMasterData(),
                 this.fetchLaporan(),
                 this.fetchGalleryData(),
                 this.fetchPromos()
