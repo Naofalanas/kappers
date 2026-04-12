@@ -40,6 +40,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const sumService = document.getElementById('sum-service');
     const sumBarber = document.getElementById('sum-barber');
     const sumDatetime = document.getElementById('sum-datetime');
+    const sumPrice = document.getElementById('sum-price');
+
+    // Applied Promo State
+    let appliedPromo = null;
+    let basePrice = 0;
+
+    // Site Settings State
+    let currentSiteSettings = {
+        wa_number: "6289630462036", // Default fallback
+        shop_name: "Kapper's"
+    };
 
     function rebindBarberListeners() {
         const radios = document.querySelectorAll('input[name="barber"]');
@@ -149,7 +160,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     `;
                 }
 
-                const colors = ['#0F172A', '#1E40AF', '#047857', '#B91C1C'];
+                const colors = ['#0F172A', '#1E293B', '#334155', '#475569']; // Menggunakan warna senada tema
                 
                 // Get predefined timeslots from DOM to calculate schedule
                 let definedSlots = [];
@@ -214,7 +225,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     // Inject to Public Showcase Grid
                     if(publicGrid) {
-                        const photoUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&size=300&background=random&color=fff&bold=true`;
+                        // Menggunakan background=0F172A agar senada dengan accent color landing page
+                        const photoUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&size=300&background=0F172A&color=fff&bold=true`;
                         let socialsHtml = '';
                         if (emp.ig_username && emp.ig_username.trim() !== '') {
                             socialsHtml += `<a href="https://instagram.com/${emp.ig_username.trim()}" target="_blank" title="Instagram"><i class="ph ph-instagram-logo"></i></a>`;
@@ -289,9 +301,71 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    // === Initialize Settings and Promo Logic ===
+    async function initSiteSettings() {
+        if (!window.db || !window.db.getSiteSettings) return;
+        const res = await window.db.getSiteSettings();
+        if (res.success && res.data) {
+            currentSiteSettings = res.data;
+            const d = res.data;
+            
+            // Inject to landing page
+            if(d.hero_text) {
+                const heroTextEl = document.querySelector('.hero h1');
+                if(heroTextEl) {
+                    heroTextEl.innerHTML = d.hero_text.replace(/\n/g, '<br>');
+                }
+            }
+            if(d.wa_number) {
+               const footerWaEl = document.querySelector('.footer-contact p:nth-child(3)');
+               if(footerWaEl) footerWaEl.innerHTML = `<i class="ph ph-whatsapp"></i> +${d.wa_number}`;
+            }
+            if(d.address) {
+                const footerAddressEl = document.querySelector('.footer-contact p:nth-child(2)');
+                if(footerAddressEl) footerAddressEl.innerHTML = `<i class="ph ph-map-pin"></i> ${d.address}`;
+            }
+            if(d.shop_name) {
+                const mainLogo = document.querySelector('.logo');
+                if(mainLogo) mainLogo.innerText = d.shop_name + '.';
+            }
+        }
+    }
+
+    // Handle Promo Application
+    const btnApplyPromo = document.getElementById('btn-apply-promo');
+    const promoCodeInput = document.getElementById('promo-code-input');
+    const promoResultEl = document.getElementById('promo-result');
+
+    if (btnApplyPromo) {
+        btnApplyPromo.addEventListener('click', async () => {
+            const code = promoCodeInput.value.trim();
+            if (!code) return;
+            
+            btnApplyPromo.disabled = true;
+            btnApplyPromo.innerText = 'Cek...';
+            
+            const res = await window.db.validatePromo(code);
+            btnApplyPromo.disabled = false;
+            btnApplyPromo.innerText = 'Pakai';
+            
+            if (res.success) {
+                appliedPromo = res.data;
+                promoResultEl.innerHTML = `✅ Potongan <strong>Rp ${res.data.discount_value.toLocaleString()}</strong> aktif!`;
+                promoResultEl.style.color = '#22c55e';
+                updateSummary();
+            } else {
+                appliedPromo = null;
+                promoResultEl.innerHTML = `❌ ${res.error}`;
+                promoResultEl.style.color = '#ef4444';
+                updateSummary();
+            }
+        });
+    }
+
     initServices();
     initCapsters();
     initGallery();
+    initSiteSettings();
 
     function updateStep() {
         // Hide all steps, show current
@@ -344,6 +418,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const dateInput = document.getElementById('booking-date').value;
         const timeInput = getSelectedValue('time');
 
+        // Extract base price using the data attribute of the selected radio
+        const selectedRadio = document.querySelector('input[name="service"]:checked');
+        basePrice = selectedRadio ? parseFloat(selectedRadio.getAttribute('data-price') || 0) : 0;
+
         sumService.innerText = serviceL;
         sumBarber.innerText = barberL;
 
@@ -351,6 +429,20 @@ document.addEventListener("DOMContentLoaded", () => {
             sumDatetime.innerText = `${dateInput} pukul ${timeInput}`;
         } else {
             sumDatetime.innerText = "Jadwal belum lengkap";
+        }
+
+        // Calculate and display price with promo
+        if (sumPrice) {
+            if (basePrice > 0) {
+                if (appliedPromo) {
+                    const finalPrice = Math.max(0, basePrice - appliedPromo.discount_value);
+                    sumPrice.innerHTML = `<span style="text-decoration:line-through; color:var(--text-secondary); font-size:0.9rem; font-weight:normal; margin-right:0.5rem;">Rp ${basePrice.toLocaleString()}</span> Rp ${finalPrice.toLocaleString()}`;
+                } else {
+                    sumPrice.innerText = `Rp ${basePrice.toLocaleString()}`;
+                }
+            } else {
+                sumPrice.innerText = "-";
+            }
         }
     }
 
@@ -402,22 +494,43 @@ document.addEventListener("DOMContentLoaded", () => {
         const barberId = getSelectedValue('barber');
         const allTimeSlots = document.querySelectorAll('.time-slot');
 
+        const todayRaw = new Date();
+        const selectedDateRaw = new Date(dateInput.value);
+        // Using toDateString to check if it's literally today
+        const isToday = selectedDateRaw.toDateString() === todayRaw.toDateString();
+        const currentHour = todayRaw.getHours();
+
         // Reset all slots to available first
         allTimeSlots.forEach(slot => {
             slot.classList.remove('disabled');
             const input = slot.querySelector('input');
             input.disabled = false;
-            // remove (Penuh) text if previously added
+            // remove (Penuh) or (Lewat) text if previously added
             const span = slot.querySelector('span');
-            span.innerText = span.innerText.replace(' (Penuh)', '');
+            span.innerText = span.innerText.replace(' (Penuh)', '').replace(' (Lewat)', '');
         });
+
+        // Disable passed hours if date is today
+        if (isToday) {
+            allTimeSlots.forEach(slot => {
+                const input = slot.querySelector('input');
+                const slotHour = parseInt(input.value.split(':')[0]);
+                if (slotHour <= currentHour) {
+                    slot.classList.add('disabled');
+                    input.disabled = true;
+                    input.checked = false;
+                    const span = slot.querySelector('span');
+                    span.innerText += ' (Lewat)';
+                }
+            });
+        }
 
         if (window.db && window.db.getBookedSlots) {
             const bookedTimes = await window.db.getBookedSlots(dateInput.value, barberId);
 
             allTimeSlots.forEach(slot => {
                 const input = slot.querySelector('input');
-                if (bookedTimes.includes(input.value)) {
+                if (bookedTimes.includes(input.value) && !input.disabled) {
                     slot.classList.add('disabled');
                     input.disabled = true;
                     input.checked = false; // uncheck if it was selected
@@ -428,6 +541,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
         }
+
     }
 
     if (dateInput) {
@@ -459,12 +573,26 @@ document.addEventListener("DOMContentLoaded", () => {
                 status: 'pending'
             };
 
+            if (appliedPromo) {
+                payload.promo_code = appliedPromo.code;
+                payload.discount_amount = appliedPromo.discount_value;
+            }
+
             // Setup WhatsApp Redirect String
-            const adminWANumber = "6289630462036"; // Ganti dengan nomor WA admin
-            let waText = `Halo Kapper's! Saya ${userName}, ingin konfirmasi pesanan:\n\n` +
+            let finalPriceText = `Rp ${basePrice.toLocaleString()}`;
+            let promoText = '';
+            if (appliedPromo) {
+                const finalP = Math.max(0, basePrice - appliedPromo.discount_value);
+                finalPriceText = `~Rp ${basePrice.toLocaleString()}~ Rp ${finalP.toLocaleString()}`;
+                promoText = `\n- *Promo Dipakai*: ${appliedPromo.code} (Diskon Rp ${appliedPromo.discount_value.toLocaleString()})`;
+            }
+
+            const adminWANumber = currentSiteSettings.wa_number.replace(/\D/g,''); // Get from settings, sanitized
+            let waText = `Halo ${currentSiteSettings.shop_name}! Saya ${userName}, ingin konfirmasi pesanan:\n\n` +
                 `- *Layanan*: ${getSelectedLabel('service')}\n` +
+                `- *Harga*: ${finalPriceText}\n` +
                 `- *Capster*: ${getSelectedLabel('barber')}\n` +
-                `- *Jadwal*: ${payload.booking_date} Pukul ${payload.time_slot}\n\n` +
+                `- *Jadwal*: ${payload.booking_date} Pukul ${payload.time_slot}${promoText}\n\n` +
                 `Terima kasih!`;
             const waUrl = `https://wa.me/${adminWANumber}?text=${encodeURIComponent(waText)}`;
 

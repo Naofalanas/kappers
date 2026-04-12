@@ -315,6 +315,106 @@ const db = {
         } catch (error) {
             return { success: false, error: error.message };
         }
+    },
+
+    // ==========================================
+    // PROMO / VOUCHER ENGINE
+    // ==========================================
+
+    async getPromos() {
+        try {
+            const { data, error } = await supabaseClient.from('promos').select('*').order('created_at', { ascending: false });
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    async addPromo(payload) {
+        try {
+            const { error } = await supabaseClient.from('promos').insert([payload]);
+            if (error) throw error;
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    async deletePromo(id) {
+        try {
+            const { error } = await supabaseClient.from('promos').delete().eq('id', id);
+            if (error) throw error;
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    // ==========================================
+    // PROMO VALIDATION (PUBLIC / BOOKING FORM)
+    // ==========================================
+
+    async validatePromo(code) {
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const { data, error } = await supabaseClient
+                .from('promos')
+                .select('*')
+                .eq('code', code.toUpperCase())
+                .gte('valid_until', today)
+                .single();
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            return { success: false, error: 'Kode promo tidak valid atau sudah kadaluarsa.' };
+        }
+    },
+
+    // ==========================================
+    // SITE SETTINGS ENGINE
+    // ==========================================
+
+    async getSiteSettings() {
+        try {
+            const { data, error } = await supabaseClient
+                .from('site_settings')
+                .select('*');
+            if (error) throw error;
+            
+            // Konversi dari array [ {setting_key: 'x', setting_value: 'y'} ] 
+            // menjadi object { x: 'y' } agar dibaca sama oleh sistem kita
+            const settingsObj = {};
+            data.forEach(item => {
+                settingsObj[item.setting_key] = item.setting_value;
+            });
+            
+            return { success: true, data: settingsObj };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    async saveSiteSettings(payload) {
+        try {
+            // Konversi payload object { x: 'y' } menjadi array
+            // [ {setting_key: 'x', setting_value: 'y'} ]
+            const updates = Object.keys(payload).map(key => ({
+                setting_key: key,
+                setting_value: payload[key]
+            }));
+
+            // Lakukan upsert (update/insert) berdasarkan setting_key
+            const { error } = await supabaseClient
+                .from('site_settings')
+                .upsert(updates, { onConflict: 'setting_key' });
+                
+            if (error) throw error;
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
     }
 };
 

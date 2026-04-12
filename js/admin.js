@@ -12,6 +12,9 @@ const adminLogic = {
         services: [],
         products: []
     },
+    financeChartInstance: null,
+    realtimeChannel: null,
+    calendarInstance: null,
     posState: {
         bookingId: null,
         capster: null,
@@ -59,21 +62,18 @@ const adminLogic = {
 
         // Apply Kasir Role Restrictions
         if (!isAdmin) {
-            // Hide Sidebar Menus
-            const mMaster = document.querySelector('[data-target="tab-master"]');
-            const mLaporan = document.querySelector('[data-target="tab-laporan"]');
-            const mGaleri = document.querySelector('[data-target="tab-galeri"]');
-            if (mMaster) mMaster.parentElement.style.display = 'none';
-            if (mLaporan) mLaporan.parentElement.style.display = 'none';
-            if (mGaleri) mGaleri.parentElement.style.display = 'none';
+            // Hide Sidebar Menus for kasir
+            const hiddenTargets = ['tab-master', 'tab-laporan', 'tab-galeri', 'tab-promo', 'tab-pengaturan', 'tab-akun'];
+            hiddenTargets.forEach(target => {
+                const link = document.querySelector(`[data-target="${target}"]`);
+                if (link) link.parentElement.style.display = 'none';
+                const tab = document.getElementById(target);
+                if (tab) tab.remove();
+            });
 
-            // Remove the tabs entirely from DOM
-            const tabMaster = document.getElementById('tab-master');
-            const tabLaporan = document.getElementById('tab-laporan');
-            const tabGaleri = document.getElementById('tab-galeri');
-            if (tabMaster) tabMaster.remove();
-            if (tabLaporan) tabLaporan.remove();
-            if (tabGaleri) tabGaleri.remove();
+            // Set role label
+            const roleEl = document.getElementById('user-role');
+            if (roleEl) roleEl.innerText = 'Staf Kasir';
         }
 
         // Setup Tab Navigation Logic
@@ -82,29 +82,56 @@ const adminLogic = {
         // Setup Forms (Admin Only)
         if (isAdmin) {
             this.setupMasterForms();
+            this.setupPromoForm();
         }
 
-        // Fetch Data for both roles
-        await this.fetchData();
+        // Fetch all data in PARALLEL for speed (no more sequential bottleneck)
+        const globalFetches = [
+            this.fetchData(),
+            this.fetchPelanggan(),
+            this.loadSettings()
+        ];
 
-        // Fetch Admin-only Data
         if (isAdmin) {
-            await this.fetchMasterData();
-            await this.fetchLaporan();
-            await this.fetchGalleryData();
+            globalFetches.push(
+                this.fetchMasterData(),
+                this.fetchLaporan(),
+                this.fetchGalleryData(),
+                this.fetchPromos()
+            );
         }
+
+        await Promise.all(globalFetches);
 
         // Setup Mobile Sidebar Toggle
         const btnSidebar = document.getElementById('btn-mobile-sidebar');
         const sidebar = document.querySelector('.sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
         if (btnSidebar && sidebar) {
-            btnSidebar.addEventListener('click', () => {
-                sidebar.classList.toggle('active');
+            const toggleSidebar = (forceClose = false) => {
+                if (forceClose) {
+                    sidebar.classList.remove('active');
+                    if (overlay) overlay.classList.remove('active');
+                } else {
+                    sidebar.classList.toggle('active');
+                    if (overlay) overlay.classList.toggle('active');
+                }
+            };
+
+            btnSidebar.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleSidebar();
             });
+
+            // Close sidebar when clicking overlay
+            if (overlay) {
+                overlay.addEventListener('click', () => toggleSidebar(true));
+            }
+
             // Close sidebar when clicking outside (in mobile view)
             document.addEventListener('click', (e) => {
                 if (window.innerWidth <= 992 && !sidebar.contains(e.target) && !btnSidebar.contains(e.target)) {
-                    sidebar.classList.remove('active');
+                    toggleSidebar(true);
                 }
             });
         }
@@ -133,6 +160,9 @@ const adminLogic = {
                 }
             });
         }
+
+        // Realtime booking subscription
+        this.setupRealtimeSubscription();
     },
 
     setupTabNavigation() {
@@ -159,9 +189,39 @@ const adminLogic = {
                 // Hide source sidebar on mobile
                 if (window.innerWidth <= 992) {
                     document.querySelector('.sidebar').classList.remove('active');
+                    const ov = document.getElementById('sidebar-overlay');
+                    if (ov) ov.classList.remove('active');
                 }
             });
         });
+    },
+
+    setupRealtimeSubscription() {
+        if (!window.supabaseClient) return;
+        
+        this.realtimeChannel = window.supabaseClient
+            .channel('booking-changes')
+            .on('postgres_changes', 
+                { event: 'INSERT', schema: 'public', table: 'bookings' },
+                (payload) => {
+                    console.log('New booking:', payload.new);
+                    
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'info',
+                        title: `Tada! Booking Baru`,
+                        html: `Pelanggan: <strong>${payload.new.customer_name}</strong><br>Layanan: ${payload.new.service_id || '-'}`,
+                        showConfirmButton: false,
+                        timer: 5000,
+                        timerProgressBar: true
+                    });
+                    
+                    // Auto-refresh data and calendar
+                    this.fetchData();
+                }
+            )
+            .subscribe();
     },
 
     async fetchData() {
@@ -177,9 +237,19 @@ const adminLogic = {
         const res = await window.db.getAllBookings();
 
         if (res.success) {
-            this.bookingsCache = res.data;
-            this.renderTable(res.data);
-            this.updateStats(res.data);
+            const pendingList = res.data.filter(b => b.status === 'pending');
+            const otherList = res.data.filter(b => b.status !== 'pending');
+            const sortedData = [...pendingList, ...otherList];
+
+            this.bookingsCache = sortedData;
+            this.renderTable(sortedData);
+            this.updateStats(sortedData);
+            this.renderUpcoming(sortedData);
+            
+            // Re-render calendar safely if initialized on the element
+            if(document.getElementById('booking-calendar')) {
+                this.initCalendar(sortedData);
+            }
         } else {
             tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: red;">Error: ${res.error}</td></tr>`;
         }
@@ -251,6 +321,120 @@ const adminLogic = {
                 }
             }
         });
+    },
+
+    applyBookingFilter() {
+        const dateFilter = document.getElementById('filter-booking-date').value;
+        const statusFilter = document.getElementById('filter-booking-status').value;
+        const searchFilter = document.getElementById('filter-booking-search').value.toLowerCase();
+        
+        let filtered = this.bookingsCache;
+        
+        if (dateFilter) {
+            filtered = filtered.filter(b => b.booking_date === dateFilter);
+        }
+        if (statusFilter) {
+            filtered = filtered.filter(b => b.status === statusFilter);
+        }
+        if (searchFilter) {
+            filtered = filtered.filter(b => 
+                (b.customer_name && b.customer_name.toLowerCase().includes(searchFilter)) ||
+                (b.customer_phone && b.customer_phone.includes(searchFilter))
+            );
+        }
+        
+        this.renderTable(filtered);
+        this.initCalendar(filtered);
+    },
+
+    clearBookingFilter() {
+        document.getElementById('filter-booking-date').value = '';
+        document.getElementById('filter-booking-status').value = '';
+        document.getElementById('filter-booking-search').value = '';
+        this.renderTable(this.bookingsCache);
+        this.initCalendar(this.bookingsCache);
+    },
+
+    toggleViewMode(mode) {
+        const btnTable = document.getElementById('btn-view-table');
+        const btnCalendar = document.getElementById('btn-view-calendar');
+        const secTable = document.getElementById('view-section-table');
+        const secCalendar = document.getElementById('view-section-calendar');
+
+        if (mode === 'table') {
+            btnTable.classList.remove('btn-outline');
+            btnTable.classList.add('btn-primary');
+            btnCalendar.classList.remove('btn-primary');
+            btnCalendar.classList.add('btn-outline');
+            
+            secTable.style.display = 'block';
+            secCalendar.style.display = 'none';
+        } else {
+            btnCalendar.classList.remove('btn-outline');
+            btnCalendar.classList.add('btn-primary');
+            btnTable.classList.remove('btn-primary');
+            btnTable.classList.add('btn-outline');
+            
+            secTable.style.display = 'none';
+            secCalendar.style.display = 'block';
+
+            this.initCalendar();
+        }
+    },
+
+    initCalendar(dataOverride = null) {
+        const calEl = document.getElementById('booking-calendar');
+        if (!calEl) return;
+        
+        const data = dataOverride || this.bookingsCache;
+        
+        const events = data.map(b => {
+             let timeStart = b.time_slot ? b.time_slot : "00:00";
+             if(timeStart.includes("-")) timeStart = timeStart.split("-")[0].trim();
+             
+             let truncTitle = b.customer_name;
+             if(truncTitle.length > 12) truncTitle = truncTitle.substring(0, 12) + "..";
+             
+             return {
+                title: `${truncTitle} (${b.barber_id === 'any' ? 'Bbs' : b.barber_id})`,
+                start: `${b.booking_date}T${timeStart}`,
+                color: b.status === 'pending' ? '#f59e0b' : 
+                       b.status === 'completed' ? '#22c55e' : '#ef4444',
+                extendedProps: { booking: b }
+            }
+        });
+        
+        if (this.calendarInstance) {
+            this.calendarInstance.destroy();
+        }
+        
+        if(typeof FullCalendar !== "undefined") {
+            this.calendarInstance = new FullCalendar.Calendar(calEl, {
+                initialView: 'dayGridMonth',
+                locale: 'id',
+                events: events,
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,listDay'
+                },
+                buttonText: {
+                    today: 'Hari Ini',
+                    month: 'Bulan',
+                    week: 'Minggu',
+                    list: 'Agenda'
+                },
+                eventClick: (info) => {
+                    const b = info.event.extendedProps.booking;
+                    Swal.fire({
+                        title: b.customer_name,
+                        html: `<b>Layanan:</b> ${b.service_id || '-'}<br><b>Kapster:</b> ${b.barber_id || '-'}<br><b>Jam:</b> ${b.time_slot || '-'}<br><b>Status:</b> ${b.status.toUpperCase()}`,
+                        icon: 'info'
+                    });
+                }
+            });
+            this.calendarInstance.render();
+        }
     },
 
     // ===================================
@@ -836,6 +1020,14 @@ const adminLogic = {
 
     async fetchLaporan() {
         if (!window.db) return;
+
+        // Set default filter to current month if not set
+        const filterMonth = document.getElementById('lap-filter-month');
+        if (filterMonth && !filterMonth.value) {
+            const now = new Date();
+            filterMonth.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        }
+
         const res = await window.db.getTransactions();
         const expRes = await window.db.getExpenses();
 
@@ -851,7 +1043,6 @@ const adminLogic = {
         let expData = expRes.success ? expRes.data : [];
 
         // Apply Month Filter if selected
-        const filterMonth = document.getElementById('lap-filter-month');
         if (filterMonth && filterMonth.value) {
             // filterMonth.value is "YYYY-MM" (e.g. "2026-04")
             data = data.filter(trx => trx.created_at.startsWith(filterMonth.value));
@@ -945,6 +1136,147 @@ const adminLogic = {
         if (elPengeluaran) elPengeluaran.innerText = `Rp ${totalPengeluaran.toLocaleString()}`;
 
         document.getElementById('lap-profit').innerText = `Rp ${profit.toLocaleString()}`;
+
+        // === RENDER LINE CHART ===
+        this.renderFinanceChart(data, expData);
+    },
+
+    renderFinanceChart(transactions, expenses) {
+        const ctx = document.getElementById('financeChart');
+        if (!ctx) return;
+
+        // Destroy previous instance to prevent memory leak
+        if (this.financeChartInstance) {
+            this.financeChartInstance.destroy();
+            this.financeChartInstance = null;
+        }
+
+        // Group transactions by date
+        const dailyOmzet = {};
+        const dailyKomisi = {};
+        transactions.forEach(trx => {
+            const dateKey = new Date(trx.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+            dailyOmzet[dateKey] = (dailyOmzet[dateKey] || 0) + parseFloat(trx.total_amount || 0);
+            dailyKomisi[dateKey] = (dailyKomisi[dateKey] || 0) + parseFloat(trx.commission_amount || 0);
+        });
+
+        // Group expenses by date
+        const dailyExpense = {};
+        expenses.forEach(exp => {
+            const dateKey = new Date(exp.expense_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+            dailyExpense[dateKey] = (dailyExpense[dateKey] || 0) + parseFloat(exp.amount || 0);
+        });
+
+        // Merge all unique dates and sort
+        const allDates = [...new Set([...Object.keys(dailyOmzet), ...Object.keys(dailyExpense)])];
+        // Sort by extracting day number (rough sort for same month)
+        allDates.sort((a, b) => parseInt(a) - parseInt(b));
+
+        const labels = allDates.length > 0 ? allDates : ['Belum ada data'];
+        const omzetData = allDates.map(d => dailyOmzet[d] || 0);
+        const komisiData = allDates.map(d => dailyKomisi[d] || 0);
+        const expenseData = allDates.map(d => dailyExpense[d] || 0);
+        const profitData = allDates.map((d, i) => omzetData[i] - komisiData[i] - expenseData[i]);
+
+        this.financeChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Omzet',
+                        data: omzetData,
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2.5,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#6366f1'
+                    },
+                    {
+                        label: 'Komisi',
+                        data: komisiData,
+                        borderColor: '#f97316',
+                        backgroundColor: 'rgba(249, 115, 22, 0.05)',
+                        fill: false,
+                        tension: 0.4,
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointRadius: 3,
+                        pointBackgroundColor: '#f97316'
+                    },
+                    {
+                        label: 'Pengeluaran',
+                        data: expenseData,
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                        fill: false,
+                        tension: 0.4,
+                        borderWidth: 2,
+                        borderDash: [3, 3],
+                        pointRadius: 3,
+                        pointBackgroundColor: '#ef4444'
+                    },
+                    {
+                        label: 'Laba Bersih',
+                        data: profitData,
+                        borderColor: '#22c55e',
+                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2.5,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#22c55e'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            padding: 20,
+                            color: '#94a3b8',
+                            font: { family: 'Plus Jakarta Sans', size: 12 }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        titleFont: { family: 'Plus Jakarta Sans', weight: '600' },
+                        bodyFont: { family: 'Plus Jakarta Sans' },
+                        padding: 12,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: (ctx) => `${ctx.dataset.label}: Rp ${ctx.parsed.y.toLocaleString()}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(148, 163, 184, 0.08)' },
+                        ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 11 } }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(148, 163, 184, 0.08)' },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: { family: 'Plus Jakarta Sans', size: 11 },
+                            callback: (v) => v >= 1000000 ? `${(v/1000000).toFixed(1)}jt` : v >= 1000 ? `${(v/1000).toFixed(0)}rb` : v
+                        }
+                    }
+                }
+            }
+        });
     },
 
     async deleteExpense(id) {
@@ -1028,6 +1360,274 @@ const adminLogic = {
                 Swal.close();
                 this.fetchGalleryData();
             } else Swal.fire('Error', res.error, 'error');
+        }
+    },
+
+    // ===================================
+    // DASHBOARD: 5 UPCOMING BOOKINGS
+    // ===================================
+
+    renderUpcoming(data) {
+        const tbody = document.getElementById('dashboard-upcoming-body');
+        if (!tbody) return;
+
+        // Filter only pending, sort by date + time ascending, take top 5
+        const upcoming = data
+            .filter(b => b.status === 'pending')
+            .sort((a, b) => {
+                const dateA = new Date(`${a.booking_date}T${a.time_slot}`);
+                const dateB = new Date(`${b.booking_date}T${b.time_slot}`);
+                return dateA - dateB;
+            })
+            .slice(0, 5);
+
+        tbody.innerHTML = '';
+
+        if (upcoming.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:2rem; color:var(--text-secondary);">Tidak ada antrean menunggu saat ini.</td></tr>`;
+            return;
+        }
+
+        upcoming.forEach(booking => {
+            const serviceDisplay = (booking.service_id || 'N/A').toUpperCase();
+            const capsterDisplay = booking.barber_id === 'any' ? 'Bebas' : (booking.barber_id || 'N/A').toUpperCase();
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>
+                    <strong>${booking.booking_date}</strong><br>
+                    <span style="color:var(--text-secondary); font-size:0.85rem;">Pukul ${booking.time_slot}</span>
+                </td>
+                <td><strong>${booking.customer_name}</strong></td>
+                <td>${serviceDisplay}</td>
+                <td>${capsterDisplay}</td>
+                <td><span class="status ${booking.status}">${booking.status}</span></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    },
+
+    // ===================================
+    // PELANGGAN DATABASE AGGREGATION
+    // ===================================
+
+    async fetchPelanggan() {
+        const tbody = document.getElementById('table-pelanggan-body');
+        if (!tbody) return;
+        
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:2rem;"><i class="ph ph-spinner ph-spin"></i> Mengkalkulasi database...</td></tr>`;
+
+        if (!window.db || !window.db.getAllBookings) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">Sistem database belum terkonfigurasi.</td></tr>`;
+            return;
+        }
+
+        const res = await window.db.getAllBookings();
+        if (!res.success) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:red;">${res.error}</td></tr>`;
+            return;
+        }
+
+        // Aggregate by customer phone (unique identifier)
+        const customers = {};
+        res.data.forEach(b => {
+            const key = b.customer_phone || b.customer_name;
+            if (!customers[key]) {
+                customers[key] = {
+                    name: b.customer_name,
+                    phone: b.customer_phone || '-',
+                    visits: 0,
+                    completedVisits: 0
+                };
+            }
+            customers[key].visits++;
+            if (b.status === 'completed') customers[key].completedVisits++;
+        });
+
+        const sorted = Object.values(customers).sort((a, b) => b.completedVisits - a.completedVisits);
+
+        tbody.innerHTML = '';
+
+        if (sorted.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">Belum ada data pelanggan.</td></tr>`;
+            return;
+        }
+
+        sorted.forEach(c => {
+            let loyaltyBadge;
+            if (c.completedVisits >= 10) {
+                loyaltyBadge = `<span class="status" style="background:linear-gradient(135deg,#fcd34d,#f59e0b); color:#78350f;">🏆 VIP GOLD</span>`;
+            } else if (c.completedVisits >= 5) {
+                loyaltyBadge = `<span class="status" style="background:rgba(99,102,241,0.15); color:#6366f1;">⭐ LOYAL</span>`;
+            } else if (c.completedVisits >= 2) {
+                loyaltyBadge = `<span class="status completed">MEMBER</span>`;
+            } else {
+                loyaltyBadge = `<span class="status pending">BARU</span>`;
+            }
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${c.name}</strong></td>
+                <td>${c.phone}</td>
+                <td style="text-align:center; font-weight:600;">${c.completedVisits}</td>
+                <td>${loyaltyBadge}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    },
+
+    // ===================================
+    // PROMO & VOUCHER CRUD
+    // ===================================
+
+    setupPromoForm() {
+        const fPromo = document.getElementById('form-promo');
+        if (fPromo) {
+            fPromo.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const payload = {
+                    code: document.getElementById('add-promo-code').value.toUpperCase(),
+                    discount_value: parseInt(document.getElementById('add-promo-value').value),
+                    valid_until: document.getElementById('add-promo-date').value
+                };
+                Swal.showLoading();
+                const res = await window.db.addPromo(payload);
+                if (res.success) {
+                    fPromo.reset();
+                    Swal.fire('Tersimpan', 'Voucher promo berhasil ditambahkan.', 'success');
+                    this.fetchPromos();
+                } else Swal.fire('Error', res.error, 'error');
+            });
+        }
+    },
+
+    async fetchPromos() {
+        if (!window.db || !window.db.getPromos) return;
+        const tbody = document.getElementById('table-promo-body');
+        if (!tbody) return;
+
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;"><i class="ph ph-spinner ph-spin"></i> Memuat promo...</td></tr>`;
+        
+        const res = await window.db.getPromos();
+        tbody.innerHTML = '';
+
+        if (!res.success) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:red;">${res.error}</td></tr>`;
+            return;
+        }
+
+        if (res.data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-secondary);">Belum ada voucher promo aktif.</td></tr>`;
+            return;
+        }
+
+        res.data.forEach(p => {
+            const isExpired = new Date(p.valid_until) < new Date();
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>
+                    <strong style="letter-spacing:0.05em; font-family:monospace; font-size:1.05rem;">${p.code}</strong>
+                    ${isExpired ? '<br><span class="status cancelled" style="margin-top:0.25rem;">EXPIRED</span>' : '<br><span class="status completed" style="margin-top:0.25rem;">AKTIF</span>'}
+                </td>
+                <td style="font-weight:600; color:var(--accent-color);">Rp ${parseInt(p.discount_value).toLocaleString()}</td>
+                <td>${new Date(p.valid_until).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</td>
+                <td><button class="btn btn-outline btn-sm action-btn" onclick="adminLogic.deletePromo('${p.id}')" style="color:red; border-color:red;" title="Hapus Voucher"><i class="ph ph-trash"></i></button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    },
+
+    async deletePromo(id) {
+        if (confirm('Yakin ingin menghapus voucher promo ini?')) {
+            Swal.showLoading();
+            const res = await window.db.deletePromo(id);
+            if (res.success) {
+                Swal.close();
+                this.fetchPromos();
+            } else Swal.fire('Error', res.error, 'error');
+        }
+    },
+
+    // ===================================
+    // SITE SETTINGS - SAVE & LOAD
+    // ===================================
+
+    async saveSettings() {
+        if (!window.db || !window.db.saveSiteSettings) {
+            Swal.fire('Error', 'Fungsi database belum siap.', 'error');
+            return;
+        }
+
+        const payload = {
+            shop_name: document.getElementById('set-shop_name')?.value || '',
+            hero_text: document.getElementById('set-hero_text')?.value || '',
+            wa_number: document.getElementById('set-wa_number')?.value || '',
+            receipt_footer: document.getElementById('set-receipt_footer')?.value || '',
+            op_hours: document.getElementById('set-op_hours')?.value || '',
+            op_days: document.getElementById('set-op_days')?.value || '',
+            address: document.getElementById('set-address')?.value || ''
+        };
+
+        Swal.fire({ title: 'Menyimpan...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+
+        const res = await window.db.saveSiteSettings(payload);
+        if (res.success) {
+            this.updateGlobalSettingsUI(payload);
+            Swal.fire({
+                icon: 'success',
+                title: 'Tersimpan!',
+                text: 'Pengaturan website berhasil diperbarui. Perubahan akan terlihat di halaman publik.',
+                timer: 2500,
+                showConfirmButton: false
+            });
+        } else {
+            Swal.fire('Gagal Menyimpan', res.error, 'error');
+        }
+    },
+
+    async loadSettings() {
+        if (!window.db || !window.db.getSiteSettings) return;
+
+        const res = await window.db.getSiteSettings();
+        if (res.success && res.data) {
+            const d = res.data;
+            const fields = ['shop_name', 'hero_text', 'wa_number', 'receipt_footer', 'op_hours', 'op_days', 'address'];
+            fields.forEach(f => {
+                const el = document.getElementById('set-' + f);
+                if (el && d[f]) {
+                    if (el.tagName === 'TEXTAREA') {
+                        el.value = d[f];
+                    } else {
+                        el.value = d[f];
+                    }
+                }
+            });
+            this.updateGlobalSettingsUI(d);
+        }
+    },
+
+    updateGlobalSettingsUI(d) {
+        if (d.shop_name) {
+            const parts = d.shop_name.trim().split(' ');
+            const first = parts.shift() || 'KAPPERS';
+            const rest = parts.join(' ');
+            
+            const brand1 = document.getElementById('ui-shop-name-1');
+            const brand2 = document.getElementById('ui-shop-name-2');
+            if (brand1) brand1.textContent = first.toUpperCase();
+            if (brand2) brand2.textContent = rest.toUpperCase();
+            
+            const receiptName = document.getElementById('receipt-shop-name');
+            if (receiptName) receiptName.textContent = d.shop_name;
+        }
+        
+        if (d.address) {
+            const receiptAddr = document.getElementById('receipt-shop-address');
+            if (receiptAddr) receiptAddr.textContent = d.address;
+        }
+        
+        if (d.receipt_footer) {
+            const receiptFooter = document.getElementById('receipt-footer-text');
+            if (receiptFooter) receiptFooter.textContent = d.receipt_footer;
         }
     }
 };

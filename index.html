@@ -44,7 +44,7 @@
                 <div class="hero-content">
                     <span class="badge">Premium Grooming Experience</span>
                     <h1>Tampil <span class="text-accent">Maksimal.</span><br>Setiap Hari.</h1>
-                    <p>Rasakan pengalaman pangkas rambut dengan pelayanan premium, lingkungan yang bersih, dan *barb*er
+                    <p>Rasakan pengalaman pangkas rambut dengan pelayanan premium, lingkungan yang bersih, dan Kapster
                         profesional yang mengerti gaya rambut modern.</p>
                     <div class="hero-buttons">
                         <button class="btn btn-primary"
@@ -54,7 +54,8 @@
                     </div>
 
                     <!-- Live Queue Indicator -->
-                    <div id="live-queue-indicator" style="margin-bottom: 2rem; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 999px; font-weight: 600; font-size: 0.875rem; background: rgba(241, 245, 249, 0.8); backdrop-filter: blur(5px); border: 1px solid var(--border-light); color: var(--text-secondary);">
+                    <div id="live-queue-indicator"
+                        style="margin-bottom: 2rem; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 999px; font-weight: 600; font-size: 0.875rem; background: rgba(241, 245, 249, 0.8); backdrop-filter: blur(5px); border: 1px solid var(--border-light); color: var(--text-secondary);">
                         <i class="ph ph-spinner ph-spin"></i> Mengecek antrian toko saat ini...
                     </div>
 
@@ -107,10 +108,12 @@
             <div class="container">
                 <div class="section-header">
                     <h2>Capster Profesional Kami</h2>
-                    <p>Ditangani langsung oleh ahlinya. Pilih capster favorit Anda untuk hasil yang lebih personal dan maksimal.</p>
+                    <p>Ditangani langsung oleh ahlinya. Pilih capster favorit Anda untuk hasil yang lebih personal dan
+                        maksimal.</p>
                 </div>
 
-                <div class="barbers-grid" id="public-barbers-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem;">
+                <div class="barbers-grid" id="public-barbers-grid"
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem;">
                     <div style="text-align:center; grid-column: 1/-1; padding: 3rem;">
                         <i class="ph ph-spinner ph-spin" style="font-size:2rem; color:var(--accent-color)"></i>
                         <p style="margin-top:1rem">Memuat daftar Capster...</p>
@@ -127,7 +130,8 @@
                     <p>Inspirasi potongan gaya rambut klasik, modern, hingga tren terkini dari kursi eksekutif kami.</p>
                 </div>
                 <div id="public-gallery-grid" class="gallery-grid">
-                    <div style="grid-column: 1/-1; text-align: center; color: var(--text-secondary); padding: 2rem;">Memuat Portofolio...</div>
+                    <div style="grid-column: 1/-1; text-align: center; color: var(--text-secondary); padding: 2rem;">
+                        Memuat Portofolio...</div>
                 </div>
             </div>
         </section>
@@ -179,7 +183,8 @@
                             <div class="options-grid" id="barber-options-container">
                                 <label class="selectable-card">
                                     <div class="sc-content barber-profile">
-                                        <div class="avatar" style="background:#64748B;"><i class="ph ph-spinner ph-spin"></i></div>
+                                        <div class="avatar" style="background:#64748B;"><i
+                                                class="ph ph-spinner ph-spin"></i></div>
                                         <strong>Memuat Data...</strong>
                                         <span>Sinkronisasi Server</span>
                                     </div>
@@ -210,10 +215,16 @@
                                                 value="13:00"><span>13:00</span></label>
                                         <label class="time-slot"><input type="radio" name="time"
                                                 value="14:00"><span>14:00</span></label>
-                                        <label class="time-slot disabled"><input type="radio" name="time" value="15:00"
-                                                disabled><span>15:00 (Penuh)</span></label>
+                                        <label class="time-slot"><input type="radio" name="time"
+                                                value="15:00"><span>15:00</span></label>
                                         <label class="time-slot"><input type="radio" name="time"
                                                 value="16:00"><span>16:00</span></label>
+                                        <label class="time-slot"><input type="radio" name="time"
+                                                value="17:00"><span>17:00</span></label>
+                                        <label class="time-slot"><input type="radio" name="time"
+                                                value="19:00"><span>19:00</span></label>
+                                        <label class="time-slot"><input type="radio" name="time"
+                                                value="20:00"><span>20:00</span></label>
                                     </div>
                                 </div>
                             </div>
@@ -230,7 +241,24 @@
                                 <p><strong>Layanan:</strong> <span id="sum-service">-</span></p>
                                 <p><strong>Capster:</strong> <span id="sum-barber">-</span></p>
                                 <p><strong>Jadwal:</strong> <span id="sum-datetime">-</span></p>
+                                <p><strong>Harga:</strong> <span id="sum-price"
+                                        style="font-weight:700; color:var(--accent-color);">-</span></p>
                             </div>
+
+                            <!-- PROMO VOUCHER -->
+                            <div class="form-group" style="margin-top: 1rem;">
+                                <label style="font-weight:600; font-size:0.9rem;">🎫 Punya Kode Voucher?
+                                    (Opsional)</label>
+                                <div style="display:flex; gap:0.5rem; margin-top:0.4rem;">
+                                    <input type="text" id="promo-code-input" class="form-control"
+                                        placeholder="Masukkan kode promo" style="text-transform:uppercase; flex:1;">
+                                    <button type="button" class="btn btn-outline" id="btn-apply-promo"
+                                        style="white-space:nowrap;">Pakai</button>
+                                </div>
+                                <div id="promo-result" style="margin-top:0.5rem; font-size:0.85rem; min-height:1.2em;">
+                                </div>
+                            </div>
+
                             <div class="user-details-form">
                                 <div class="form-group">
                                     <label>Nama Lengkap</label>
@@ -259,7 +287,8 @@
         <div class="container footer-grid">
             <div class="footer-brand">
                 <h3>Kapper's</h3>
-                <p>Premium Barbershop Executive di kota Anda. Kami memberikan layanan pangkas rambut terbaik dengan standar profesional.</p>
+                <p>Premium Barbershop Executive di kota Anda. Kami memberikan layanan pangkas rambut terbaik dengan
+                    standar profesional.</p>
             </div>
             <div class="footer-hours">
                 <h4>Jam Operasional</h4>
